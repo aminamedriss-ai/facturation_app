@@ -22,6 +22,11 @@ import io
 from decimal import Decimal
 from pathlib import Path
 # 📷 Afficher un logo
+st.set_page_config(
+    page_title="Gestion de la Facturation",
+    page_icon="logo2.png",  # chemin local ou URL
+    layout="wide"
+)
 st.markdown(
     """
     <style>
@@ -286,7 +291,8 @@ def generer_facture_pdf(employe_dict, nom_fichier):
     buffer.close()
     return pdf
 
-st.set_page_config(page_title="Gestion de la Facturation", page_icon="📊", layout="wide")
+
+
 
 # 📌 Initialisation
 if "clients" not in st.session_state:
@@ -391,26 +397,6 @@ if st.session_state.selected_client:
         if not df_client.empty:
             mois_possibles = [mois.lower() for mois in calendar.month_name if mois]
             colonnes_mois = [col for col in df_client.columns if any(mois in col.lower() for mois in mois_possibles)]
-
-            # 1. Construire employe_data
-            # employe_data = []
-            # for _, row in df_client.iterrows():
-            #     data_dict = row.to_dict()
-            #     data_dict["Mois"] = [col for col in colonnes_mois]
-            #     data_dict["data"] = {
-            #         ligne: [row.get(col, "") for col in colonnes_mois]
-            #         for ligne in [
-            #             "Salaire de base (DZD)", "Prime mensuelle (DZD)", "IFSP (20% du salaire de base)",
-            #             "Indemnité non cotisable et imposable 10% (DZD)", "Frais de remboursement (Véhicule) (DZD)", 
-            #             "Indemnité de panier (DZD)", "Indemnité de transport (DZD)", "Prime vestimentaire (DZD)",
-            #             "Base cotisable", "IRG barème", "IRG 10%", "Salaire brut",
-            #             "Retenue CNAS employé", "Salaire net", "CNAS employeur",
-            #             "Cotisation œuvre sociale", "Taxe formation", "Masse salariale",
-            #             "Coût congé payé", "Coût salaire", "Facture HT"
-            #         ]
-            #     }
-            #     employe_data.append(data_dict)
-
             st.success(f"{len(df_client)} employés trouvés.")
             col1, col2, col3 = st.columns(3)
             with col1:
