@@ -27,69 +27,76 @@ st.set_page_config(
     page_icon="logo2.png",  # chemin local ou URL
     layout="wide"
 )
-st.markdown(
-    """
-    <style>
-    .logo-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin-bottom: 20px;
-    }
+st.markdown("""
+<style>
+/* 🖼 Logo centré */
+.logo-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 20px;
+}
 
-    .logo {
-        width: 200px;
-        height: auto;
-    }
+.logo {
+    width: 200px;
+    height: auto;
+}
 
-    /* 🌈 Arrière-plan personnalisé */
-    body, .stApp {
-        background: #1d2e4e;
-        font-family: 'Segoe UI', sans-serif;
-        color-scheme: dark ;
-    }
+/* 🌈 Arrière-plan personnalisé + forcer mode sombre */
+html, body, .stApp {
+    background: #1d2e4e !important;
+    font-family: 'Segoe UI', sans-serif;
+    color-scheme: dark !important; /* Empêche l'inversion automatique */
+    color: white !important;
+}
 
-    /* 🖍️ Titre centré et coloré */
-    .main > div > div > div > div > h1 {
-        text-align: center;
-        color: #00796B !important;
-    }
+/* 🖍️ Titre centré et coloré */
+.main > div > div > div > div > h1 {
+    text-align: center;
+    color: #00796B !important;
+}
 
-    /* 🧼 Nettoyage des bordures Streamlit par défaut */
-    .css-18e3th9 {
-        padding: 1rem 0.5rem;
-    }
-    /* 🎨 Changer la couleur de fond de la sidebar */
+/* 🧼 Nettoyage des bordures Streamlit */
+.css-18e3th9 {
+    padding: 1rem 0.5rem;
+}
+
+/* 🎨 Sidebar */
 section[data-testid="stSidebar"] {
-    background-color: #1f3763;  /* Change cette couleur */
+    background-color: #1f3763 !important;
+    color: white !important;
 }
 
-/* 🖌️ Changer la couleur du texte dans la sidebar */
 section[data-testid="stSidebar"] .css-1v3fvcr {
-    color: #1a237e !important;
+    color: white !important;
 }
 
-/* 🌈 Changer la couleur des titres (optionnel) */
+/* 🌈 Titres dans la sidebar */
 section[data-testid="stSidebar"] h1, 
 section[data-testid="stSidebar"] h2, 
 section[data-testid="stSidebar"] h3 {
     color: #e01b36 !important;
 }
-/* 🎨 Barre supérieure (header) */
+
+/* 🎨 Barre supérieure */
 header[data-testid="stHeader"] {
-    background-color: #06dbae;  /* couleur bleu foncé */
-    color: white;
+    background-color: #06dbae !important;
+    color: white !important;
 }
 
-/* 🧪 Supprimer la transparence si elle est appliquée */
+/* 🧪 Supprimer la transparence */
 header[data-testid="stHeader"]::before {
     content: "";
-    background: none;
+    background: none !important;
 }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+
+/* 📱 Correction mobile : forcer couleurs partout */
+h1, h2, h3, p, span, label {
+    color: white !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 
 # 🖼️ Ajouter un logo (remplacer "logo.png" par ton fichier ou une URL)
 with open("logo.png", "rb") as image_file:
@@ -662,3 +669,4 @@ if st.session_state.selected_client:
           
     else:
         st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
