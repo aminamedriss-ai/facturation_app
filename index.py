@@ -20,6 +20,7 @@ import math
 import numpy as np
 import io
 from decimal import Decimal
+from pathlib import Path
 # 📷 Afficher un logo
 st.markdown(
     """
@@ -286,45 +287,89 @@ def generer_facture_pdf(employe_dict, nom_fichier):
     return pdf
 
 st.set_page_config(page_title="Gestion de la Facturation", page_icon="📊", layout="wide")
+
+# 📌 Initialisation
+if "clients" not in st.session_state:
+    st.session_state.clients = []
+if "selected_client" not in st.session_state:
+    st.session_state.selected_client = None
+if "full_df" not in st.session_state:
+    st.session_state.full_df = None
+if "data" not in st.session_state:
+    st.session_state.data = {}
+
+
+CLIENTS_FILE = Path("clients.json")
 st.title("👥 Gestion des clients et des employés")
 
-# 🧠 Initialisation des clients
-if "clients" not in st.session_state:
-    st.session_state.clients = [
+# 📂 Charger la liste des clients
+if CLIENTS_FILE.exists():
+    with open(CLIENTS_FILE, "r", encoding="utf-8") as f:
+        clients_list = json.load(f)
+else:
+    clients_list = [
         "Abbott", "Samsung", "Henkel", "G+D", "Maersk",
         "Cahors", "PMi", "Siemens", "Syngenta", "LG",
         "Epson", "EsteL", "JTI", "Siemens Energy", "Wilhelmsen",
-        "Healthineers", "Contrat auto-entrepreneur", "Coca cola", " IPSEN", "SOGEREC","CCIS ex SOGEREC",
-        " Roche", "Tango", "VARION"
+        "Healthineers", "Contrat auto-entrepreneur", "Coca cola", "IPSEN", "SOGEREC","CCIS ex SOGEREC",
+        "Roche", "Tango", "VARION"
     ]
-    st.session_state.selected_client = None
-    st.session_state.full_df = None  # stocke le fichier global
-    st.session_state.data = {}
+    with open(CLIENTS_FILE, "w", encoding="utf-8") as f:
+        json.dump(clients_list, f, ensure_ascii=False, indent=2)
 
-# 📁 Upload du fichier global une seule fois
+st.session_state.clients = clients_list
+
+# 📁 Upload du fichier global
 st.sidebar.subheader("📅 Charger le fichier récapitulatif (tous les clients)")
 uploaded_csv = st.sidebar.file_uploader("Fichier CSV global", type=["csv"], key="csv_recap")
 
 if uploaded_csv is not None:
     try:
         df_full = pd.read_csv(uploaded_csv, skiprows=2, decimal=",", thousands=" ") 
-        # st.write(df_full.dtypes)
         st.write(df_full.head())
-
-
         st.session_state.full_df = df_full
         st.sidebar.success("✅ Fichier chargé avec succès !")
     except Exception as e:
         st.sidebar.error(f"❌ Erreur : {e}")
 
 # ➕ Ajouter un nouveau client
-with st.sidebar:
-    st.subheader("➕ Ajouter un nouveau client")
-    new_client = st.text_input("Nom du nouveau client")
-    if st.button("Ajouter"):
-        if new_client and new_client not in st.session_state.clients:
-            st.session_state.clients.append(new_client)
-            st.success(f"Client '{new_client}' ajouté !")
+st.sidebar.subheader("➕ Ajouter un nouveau client")
+new_client = st.sidebar.text_input("Nom du nouveau client")
+if st.sidebar.button("Ajouter"):
+    if new_client and new_client not in st.session_state.clients:
+        st.session_state.clients.append(new_client)
+        with open(CLIENTS_FILE, "w", encoding="utf-8") as f:
+            json.dump(st.session_state.clients, f, ensure_ascii=False, indent=2)
+        st.sidebar.success(f"Client '{new_client}' ajouté !")
+
+# 🗑️ Supprimer un client avec confirmation
+st.sidebar.subheader("🗑️ Supprimer un client")
+client_to_delete = st.sidebar.selectbox("Choisir le client à supprimer", [""] + st.session_state.clients)
+
+# Variable temporaire pour confirmation
+if "confirm_delete" not in st.session_state:
+    st.session_state.confirm_delete = None
+
+if st.sidebar.button("Supprimer"):
+    if client_to_delete and client_to_delete in st.session_state.clients:
+        st.session_state.confirm_delete = client_to_delete  # on garde le nom en mémoire
+
+# Si un client est en attente de confirmation
+if st.session_state.confirm_delete:
+    st.warning(f"⚠️ Êtes-vous sûr de vouloir supprimer le client '{st.session_state.confirm_delete}' ?")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("✅ Oui, supprimer"):
+            st.session_state.clients.remove(st.session_state.confirm_delete)
+            with open(CLIENTS_FILE, "w", encoding="utf-8") as f:
+                json.dump(st.session_state.clients, f, ensure_ascii=False, indent=2)
+            st.success(f"Client '{st.session_state.confirm_delete}' supprimé avec succès !")
+            st.session_state.confirm_delete = None  # reset
+    with col2:
+        if st.button("❌ Annuler"):
+            st.info("Suppression annulée.")
+            st.session_state.confirm_delete = None
+
 
 # 🧽 Sélection d'un client
 st.subheader("Sélectionnez un client")
@@ -333,7 +378,6 @@ for i, client in enumerate(st.session_state.clients):
     with cols[i % 6]:
         if st.button(client):
             st.session_state.selected_client = client
-
 # 🎯 Affichage des employés du client sélectionné
 if st.session_state.selected_client:
     st.markdown(f"## 👤 Données des employés pour **{st.session_state.selected_client.strip()}**")
