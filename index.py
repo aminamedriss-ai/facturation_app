@@ -46,6 +46,7 @@ st.markdown(
     body, .stApp {
         background: #1d2e4e;
         font-family: 'Segoe UI', sans-serif;
+        color-scheme: dark;
     }
 
     /* 🖍️ Titre centré et coloré */
@@ -661,3 +662,4 @@ if st.session_state.selected_client:
           
     else:
         st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
