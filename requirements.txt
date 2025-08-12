@@ -2,10 +2,3 @@ streamlit
 pandas
 numpy
 reportlab
-io
-json
-os
-hashlib
-base64
-calendar
-decimal
