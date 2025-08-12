@@ -97,7 +97,7 @@ h1, h2, h3, p, span, label {
 
 /* 🔵 Boutons bleu foncé forcés */
 .stButton button {
-    background-color: #003366 !important; /* Bleu foncé */
+    background-color: #2b2c36 !important; /* Bleu foncé */
     color: white !important;
     border: none !important;
     border-radius: 8px !important;
@@ -108,7 +108,7 @@ h1, h2, h3, p, span, label {
 }
 
 .stButton button:hover {
-    background-color: #004080 !important; /* Bleu plus clair au survol */
+    background-color: #43444e !important; /* Bleu plus clair au survol */
     color: white !important;
 }
 </style>
@@ -687,6 +687,7 @@ if st.session_state.selected_client:
           
     else:
         st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
