@@ -29,28 +29,74 @@ st.set_page_config(
 )
 st.markdown("""
 <style>
-/* 🌑 Forcer style bouton pour thème sombre */
-button[kind="primary"], .stButton button {
-    background-color: #06dbae !important; /* couleur fond */
-    color: white !important;              /* texte */
-    border: none !important;               /* pas de bordure */
-    border-radius: 8px !important;         /* coins arrondis */
-    padding: 0.5rem 1rem !important;
+/* 🖼 Logo centré */
+.logo-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 20px;
 }
 
-/* 🎯 Effet au survol */
-button[kind="primary"]:hover, .stButton button:hover {
-    background-color: #04b999 !important;
+.logo {
+    width: 200px;
+    height: auto;
+}
+
+/* 🌈 Arrière-plan personnalisé + forcer mode sombre */
+html, body, .stApp {
+    background: #1d2e4e !important;
+    font-family: 'Segoe UI', sans-serif;
+    color-scheme: dark !important; /* Empêche l'inversion automatique */
     color: white !important;
 }
 
-/* 📱 Évite que le mobile remette du blanc automatiquement */
-.stButton button {
-    -webkit-appearance: none !important;
-    appearance: none !important;
+/* 🖍️ Titre centré et coloré */
+.main > div > div > div > div > h1 {
+    text-align: center;
+    color: #00796B !important;
+}
+
+/* 🧼 Nettoyage des bordures Streamlit */
+.css-18e3th9 {
+    padding: 1rem 0.5rem;
+}
+
+/* 🎨 Sidebar */
+section[data-testid="stSidebar"] {
+    background-color: #1f3763 !important;
+    color: white !important;
+}
+
+section[data-testid="stSidebar"] .css-1v3fvcr {
+    color: white !important;
+}
+
+/* 🌈 Titres dans la sidebar */
+section[data-testid="stSidebar"] h1, 
+section[data-testid="stSidebar"] h2, 
+section[data-testid="stSidebar"] h3 {
+    color: #e01b36 !important;
+}
+
+/* 🎨 Barre supérieure */
+header[data-testid="stHeader"] {
+    background-color: #06dbae !important;
+    color: white !important;
+}
+
+/* 🧪 Supprimer la transparence */
+header[data-testid="stHeader"]::before {
+    content: "";
+    background: none !important;
+}
+
+/* 📱 Correction mobile : forcer couleurs partout */
+h1, h2, h3, p, span, label {
+    color: white !important;
 }
 </style>
 """, unsafe_allow_html=True)
+
 
 
 # 🖼️ Ajouter un logo (remplacer "logo.png" par ton fichier ou une URL)
@@ -624,5 +670,6 @@ if st.session_state.selected_client:
           
     else:
         st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
