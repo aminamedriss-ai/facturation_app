@@ -94,6 +94,23 @@ header[data-testid="stHeader"]::before {
 h1, h2, h3, p, span, label {
     color: white !important;
 }
+
+/* 🔵 Boutons bleu foncé forcés */
+.stButton button {
+    background-color: #003366 !important; /* Bleu foncé */
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 0.5rem 1rem !important;
+    font-weight: bold !important;
+    -webkit-appearance: none !important; /* Évite style par défaut mobile */
+    appearance: none !important;
+}
+
+.stButton button:hover {
+    background-color: #004080 !important; /* Bleu plus clair au survol */
+    color: white !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -670,6 +687,7 @@ if st.session_state.selected_client:
           
     else:
         st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
