@@ -46,13 +46,13 @@ st.markdown(
     body, .stApp {
         background: #1d2e4e;
         font-family: 'Segoe UI', sans-serif;
-        color-scheme: dark;
+        color-scheme: dark ;
     }
 
     /* 🖍️ Titre centré et coloré */
     .main > div > div > div > div > h1 {
         text-align: center;
-        color: #00796B;
+        color: #00796B !important;
     }
 
     /* 🧼 Nettoyage des bordures Streamlit par défaut */
@@ -73,7 +73,7 @@ section[data-testid="stSidebar"] .css-1v3fvcr {
 section[data-testid="stSidebar"] h1, 
 section[data-testid="stSidebar"] h2, 
 section[data-testid="stSidebar"] h3 {
-    color: #e01b36;
+    color: #e01b36 !important;
 }
 /* 🎨 Barre supérieure (header) */
 header[data-testid="stHeader"] {
@@ -662,4 +662,3 @@ if st.session_state.selected_client:
           
     else:
         st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
-
