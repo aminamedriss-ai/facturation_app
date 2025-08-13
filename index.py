@@ -114,6 +114,8 @@ h1, h2, h3, p, span, label {
 </style>
 """, unsafe_allow_html=True)
 
+
+
 # 🖼️ Ajouter un logo (remplacer "logo.png" par ton fichier ou une URL)
 with open("logo.png", "rb") as image_file:
     encoded = base64.b64encode(image_file.read()).decode()
@@ -124,6 +126,10 @@ st.markdown(
         <img class="logo" src="data:image/png;base64,{encoded}">
     </div>
     """,
+    unsafe_allow_html=True
+)
+st.markdown(
+    "<h1 style='text-align: center;'>Bienvenue sur l'application de calcul des factures</h1>",
     unsafe_allow_html=True
 )
 USERS_FILE = "users.json"
@@ -212,7 +218,7 @@ if not st.session_state["authenticated"]:
 logout()
 
 # 🎉 Application principale ici
-st.title("Bienvenue sur l'application de calcule des factures")
+# st.title("Bienvenue sur l'application de calcule des factures")
 
 def nettoyer_colonne(df, col):
     return (
