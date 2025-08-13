@@ -212,7 +212,7 @@ if not st.session_state["authenticated"]:
 logout()
 
 # 🎉 Application principale ici
-st.title("Bienvenue sur l'application de facturation")
+st.title("Bienvenue sur l'application de calcule des factures")
 
 def nettoyer_colonne(df, col):
     return (
@@ -330,7 +330,7 @@ if "data" not in st.session_state:
 
 
 CLIENTS_FILE = Path("clients.json")
-st.title("👥 Gestion des clients et des employés")
+# st.title("👥 Gestion des clients et des employés")
 
 # 📂 Charger la liste des clients
 if CLIENTS_FILE.exists():
@@ -338,7 +338,7 @@ if CLIENTS_FILE.exists():
         clients_list = json.load(f)
 else:
     clients_list = [
-        "Abbott", "Samsung", "Henkel", "G+D", "Maersk",
+       "Abbott", "Samsung", "Henkel", "G+D", "Maersk",
         "Cahors", "PMi", "Siemens", "Syngenta", "LG",
         "Epson", "EsteL", "JTI", "Siemens Energy", "Wilhelmsen",
         "Healthineers", "Contrat auto-entrepreneur", "Coca cola", "IPSEN", "SOGEREC","CCIS ex SOGEREC",
@@ -346,7 +346,13 @@ else:
     ]
     with open(CLIENTS_FILE, "w", encoding="utf-8") as f:
         json.dump(clients_list, f, ensure_ascii=False, indent=2)
-client_name = st.sidebar.selectbox("Sélectionner le client", clients_list)
+client_name = st.sidebar.selectbox(
+    "Sélectionner un client",
+    options=clients_list,
+    index=None,  # <-- pas de sélection initiale
+    placeholder="— Sélectionner un client —",
+    key="client_select",
+)
 st.session_state.clients = clients_list
 
 # 📁 Upload du fichier global
@@ -402,7 +408,7 @@ if st.session_state.confirm_delete:
 
 
 # 🧽 Sélection d'un client
-st.subheader("Sélectionnez un client")
+# st.subheader("Sélectionnez un client")
 # 🎯 Affichage des employés du client sélectionné
 st.session_state.selected_client = client_name
 if st.session_state.selected_client:
