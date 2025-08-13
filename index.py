@@ -291,7 +291,7 @@ def generer_facture_pdf(employe_dict, nom_fichier):
     # 📌 Logos
     logo_entreprise_path = "logo3.jpg"  # Ton logo principal
     etablissement = str(employe_dict.get("Etablissement", "")).strip()
-    logo_etablissement_path = f"Logos/{etablissement}.png"
+    logo_etablissement_path = f"facturation_app/Logos/{etablissement}.png"
 
     # Charger les images si elles existent
     logo_entreprise = Image(logo_entreprise_path, width=80, height=80) if os.path.exists(logo_entreprise_path) else ""
@@ -716,4 +716,5 @@ if st.session_state.selected_client:
             st.warning("⚠️ Aucun employé trouvé pour ce client ")
     else:
         st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
