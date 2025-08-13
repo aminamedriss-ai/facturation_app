@@ -631,7 +631,7 @@ if st.session_state.selected_client:
             tva_multiplicateur = 1+ (tva_tarif/100)
             df_client["Facture TVA"] = df_client["Facture HT"] * tva_multiplicateur
            
-            st.write(df_client.head()) # On peut encapsuler ton code de calculs dans une fonction
+            st.write(df_client.head(57)) # On peut encapsuler ton code de calculs dans une fonction
             
 
             # ------------------------------------------------
@@ -683,4 +683,5 @@ if st.session_state.selected_client:
             st.warning("⚠️ Aucun employé trouvé pour ce client ")
     else:
         st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
