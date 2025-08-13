@@ -114,8 +114,6 @@ h1, h2, h3, p, span, label {
 </style>
 """, unsafe_allow_html=True)
 
-
-
 # 🖼️ Ajouter un logo (remplacer "logo.png" par ton fichier ou une URL)
 with open("logo.png", "rb") as image_file:
     encoded = base64.b64encode(image_file.read()).decode()
@@ -348,7 +346,7 @@ else:
     ]
     with open(CLIENTS_FILE, "w", encoding="utf-8") as f:
         json.dump(clients_list, f, ensure_ascii=False, indent=2)
-
+client_name = st.sidebar.selectbox("Sélectionner le client", clients_list)
 st.session_state.clients = clients_list
 
 # 📁 Upload du fichier global
@@ -405,12 +403,8 @@ if st.session_state.confirm_delete:
 
 # 🧽 Sélection d'un client
 st.subheader("Sélectionnez un client")
-cols = st.columns(6)
-for i, client in enumerate(st.session_state.clients):
-    with cols[i % 6]:
-        if st.button(client):
-            st.session_state.selected_client = client
 # 🎯 Affichage des employés du client sélectionné
+st.session_state.selected_client = client_name
 if st.session_state.selected_client:
     st.markdown(f"## 👤 Données des employés pour **{st.session_state.selected_client.strip()}**")
 
@@ -687,8 +681,3 @@ if st.session_state.selected_client:
           
     else:
         st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
-
-
-
-
-
