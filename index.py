@@ -292,7 +292,7 @@ def generer_facture_pdf(employe_dict, nom_fichier):
     lignes = [
         "Salaire de base calcule", "Prime mensuelle calcule", "IFSP (20% du salaire de base)",
         "Prime exeptionnelle (10%) (DZD)", "Frais remboursement calcule",
-        "Indemnité de panier calcule", "Indemnité de transport calcule", "Prime vestimentaire (DZD)",
+        "Indemnité de panier calcule", "Indemnité de transport calcule", "Prime vestimentaire (DZD)","Indemnité 22jours",
         "Base cotisable","Base imposable au baréme", "IRG barème", "IRG 10%", "Salaire brut",
         "Retenue CNAS employé", "Salaire net", "CNAS employeur",
         "Cotisation œuvre sociale", "Taxe formation", "Taxe formation et os", "Masse salariale",
@@ -445,19 +445,20 @@ if st.session_state.selected_client:
             st.success(f"{len(df_client)} employés trouvés.")
             col1, col2, col3 = st.columns(3)
             with col1:
-                fees_etablissement_pct = st.number_input("Fees etalent (%)", min_value=0.0, max_value=100.0, step=0.1, value=0.0)
-                complementaire_sante_tarif = st.number_input("Complémentaire santé (DZD)", min_value=0.0, step=1.0, value=0.0)
-                phone = st.number_input("Frais téléphone", min_value=0.0, step=1.0, value=0.0)
+                fees_etablissement_pct = st.number_input("Fees etalent (%)", min_value=0.0, max_value=100.0, step=5.0, value=0.0)
+                complementaire_sante_tarif = st.number_input("Complémentaire santé (DZD)", min_value=0.0, step=500.0, value=0.0)
+                phone = st.number_input("Frais téléphone", min_value=0.0, step=500.0, value=0.0)
 
             with col2:
-                indemnite_moto_tarif = st.number_input("Indemnité moto (DZD)", min_value=0.0, step=1.0, value=0.0)
-                tap_tarif = st.number_input("TAP (DZD)", min_value=0.0, step=1.0, value=0.0)
-                indemnite_zone = st.number_input("Indemnité de zone (DZD)", min_value=0.0, step=1.0, value=0.0)
+                indemnite_moto_tarif = st.number_input("Indemnité moto (DZD)", min_value=0.0, step=500.0, value=0.0)
+                tap_tarif = st.number_input("TAP (DZD)", min_value=0.0, step=500.0, value=0.0)
+                indemnite_zone = st.number_input("Indemnité de zone (DZD)", min_value=0.0, step=500.0, value=0.0)
+                taux_supp = st.number_input("Taux supp (%)", min_value=0.0, max_value=100.0, step=10.0, value=0.0)
             with col3:
-                tva_tarif = st.number_input("TVA (%)", min_value=0.0, max_value=100.0, step=0.1, value=0.0)
-                frais_divers_tarif = st.number_input("Frais divers + transport (Yassir) (DZD)", min_value=0.0, step=1.0, value=0.0)
-                augmentation = st.number_input("Augmentation (%)", min_value=0.0, max_value=100.0, step=0.1, value=0.0)
-                jours_mois = st.number_input("Jours mois", min_value=0.0, step=1.0, value=0.0)
+                tva_tarif = st.number_input("TVA (%)", min_value=0.0, max_value=100.0, step=10.0, value=0.0)
+                frais_divers_tarif = st.number_input("Frais divers + transport (Yassir) (DZD)", min_value=0.0, step=500.0, value=0.0)
+                augmentation = st.number_input("Augmentation (%)", min_value=0.0, max_value=100.0, step=10.0, value=0.0)
+                jours_mois = st.number_input("Jours mois", min_value=28.0, max_value=31.0, step=1.0, value=30.0)
 
             # 2. Nettoyage des colonnes
             cols_to_float = [
@@ -466,7 +467,8 @@ if st.session_state.selected_client:
                 "Indemnité de panier (DZD)", "Indemnité de transport (DZD)", "Nouveau Salaire de base (DZD)",
                 "Prime vestimentaire (DZD)", "Nouvelle Indemnité de panier (DZD)",  "Nouvelle Indemnité de transport (DZD)",
                  "Nouvelle Prime mensuelle (DZD)", "Nouveaux Frais de remboursement (Véhicule) (DZD)","Prime vestimentaire (DZD)", " Indémnité Véhicule (DZD)",
-                 "Absence (Jour)","Absence Maladie (Jour)","Absence Maternité (Jour)", "Absence Mise à pied (Jour)", "Jours de congé (Jour)"
+                 "Absence (Jour)","Absence Maladie (Jour)","Absence Maternité (Jour)", "Absence Mise à pied (Jour)", "Jours de congé (Jour)",
+                 "Heures supp 100% (H)", "Heures supp 75% (H)", "Heures supp 50% (H)", "Jours supp (Jour)"
             ]
             for col in cols_to_float:
                 if col in df_client.columns:
@@ -480,29 +482,37 @@ if st.session_state.selected_client:
                 df_client["Absence Mise à pied (Jour)"] +
                 df_client["Jours de congé (Jour)"]
             )
+            HEURES_MOIS = 173.33
             # 3. Calculs (une seule fois)
             df_client["Salaire de base calcule"] = (get_valeur("Salaire de base (DZD)", "Nouveau Salaire de base (DZD)")+df_client["IFSP (20% du salaire de base)"])
             df_client["Indemnité de panier calcule"] = get_valeur("Indemnité de panier (DZD)", "Nouvelle Indemnité de panier (DZD)")
             df_client["Indemnité de transport calcule"] = get_valeur("Indemnité de transport (DZD)", "Nouvelle Indemnité de transport (DZD)")
             df_client["Prime mensuelle calcule"] = get_valeur("Prime mensuelle (DZD)", "Nouvelle Prime mensuelle (DZD)")
             df_client["Frais remboursement calcule"] = get_valeur("Frais de remboursement (Véhicule) (DZD)", "Nouveaux Frais de remboursement (Véhicule) (DZD)")
-            # df_client["Salaire de base calcule"] = (
-            #     df_client["Salaire de base calcule"] * (1 + (augmentation / 100))
-            # ) * ((jours_mois - absences_total) / jours_mois)
-            # df_client["Indemnité de panier calcule"]= df_client["Indemnité de panier calcule"]- ((df_client["Indemnité de panier calcule"]/22)*absences_total)+(df_client["Indemnité de panier calcule"]/22)
-            # df_client["Indemnité de transport calcule"]= df_client["Indemnité de transport calcule"] -((df_client["Indemnité de transport calcule"]/22)*absences_total)+(df_client["Indemnité de transport calcule"]/22)
-            # df_client["Prime vestimentaire (DZD)"]=df_client["Prime vestimentaire (DZD)"]-((df_client["Prime vestimentaire (DZD)"]/22)*absences_total)+(df_client["Prime vestimentaire (DZD)"]/22)
+            print(df_client["Salaire de base calcule"])
+            df_client["Salaire de base calcule"] = df_client["Salaire de base calcule"] * (1 + (augmentation / 100))
+            salaire_journalier = df_client["Salaire de base calcule"] / jours_mois
+            df_client["Salaire de base calcule"] = (df_client["Salaire de base calcule"]
+                                                    -df_client["Salaire de base calcule"] /30
+                                                    * absences_total+ df_client["Salaire de base calcule"]/HEURES_MOIS *
+                                                    (df_client["Heures supp 100% (H)"] *2)+ (df_client["Jours supp (Jour)"] * 
+                                                    salaire_journalier * (taux_supp / 100)))
+            
+            df_client["Indemnitésomme"]= df_client["Indemnité de panier calcule"] + df_client["Indemnité de transport calcule"] + df_client["Prime vestimentaire (DZD)"]
+            df_client["Indemnité 22jours"]= df_client["Indemnitésomme"]-df_client["Indemnitésomme"]/22*absences_total + df_client["Indemnitésomme"]/22* (df_client["Heures supp 100% (H)"]+(0/60))/8
             df_client["Base cotisable"] = (
                 df_client["Prime exeptionnelle (10%) (DZD)"] + indemnite_zone + 
                 df_client["Prime mensuelle calcule"] + df_client["Salaire de base calcule"]
             )
             df_client["Base imposable 10%"] = df_client["Prime exeptionnelle (10%) (DZD)"] * 0.91
             df_client["Retenue CNAS employé"] = df_client["Base cotisable"] * 0.09
-            if df_client["Etablissement"].iloc[0] == "Henkel":    
+            if df_client["Etablissement"].iloc[0] == "Henkel": 
+                
                 df_client["Base imposable au baréme"]  = ((((df_client["Salaire de base calcule"]+ df_client["Prime mensuelle calcule"])-((df_client["Salaire de base calcule"]+ df_client["Prime mensuelle calcule"])*0.09))+df_client["Indemnité de panier calcule"])/10)*10
                 
             else:
-                df_client["Base imposable au baréme"] = (np.floor(((df_client["Base cotisable"] - df_client["Prime exeptionnelle (10%) (DZD)"]- indemnite_zone) * 0.91+ (df_client["Indemnité de panier calcule"]) + df_client["Indemnité de transport calcule"] + df_client["Prime vestimentaire (DZD)"]+df_client[ " Indémnité Véhicule (DZD)"])/ 10) * 10)
+                df_client["Base imposable au baréme"] = np.floor((((df_client["Base cotisable"] - df_client["Prime exeptionnelle (10%) (DZD)"]- indemnite_zone) * 0.91+ df_client["Indemnité 22jours"]))/ 10) * 10
+                
             def irg_bareme(base):
                 b = np.ceil(base / 10) * 10  # PLAFOND(...;10) en Excel
                 
@@ -529,7 +539,7 @@ if st.session_state.selected_client:
             df_client["IRG 10%"] = df_client["Base imposable 10%"] * 0.10
             df_client["Salaire brut"] = (
                 df_client["Base cotisable"] +
-                df_client["Indemnité de panier calcule"] + df_client["Indemnité de transport calcule"] +df_client["Prime vestimentaire (DZD)"]+
+                df_client["Indemnité 22jours"]+
                 df_client["Frais remboursement calcule"] + df_client[ " Indémnité Véhicule (DZD)"]
             )
             df_client["Salaire net"] = (
@@ -622,7 +632,7 @@ if st.session_state.selected_client:
             df_client["Facture TVA"] = df_client["Facture HT"] * tva_multiplicateur
            
             st.write(df_client.head()) # On peut encapsuler ton code de calculs dans une fonction
-            # df_client = employe_data["df_client"]     # Le dataframe mis à jour avec toutes les colonnes calculées
+            
 
             # ------------------------------------------------
             # 📥 Génération et téléchargement Excel
@@ -673,3 +683,4 @@ if st.session_state.selected_client:
             st.warning("⚠️ Aucun employé trouvé pour ce client ")
     else:
         st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
