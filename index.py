@@ -21,6 +21,7 @@ import numpy as np
 import io
 from decimal import Decimal
 from pathlib import Path
+from rapidfuzz import process, fuzz
 # 📷 Afficher un logo
 st.set_page_config(
     page_title="Gestion de la Facturation",
@@ -246,6 +247,14 @@ def get_valeur(col_base, col_nouveau):
         )
     else:
         return nettoyer_colonne(df_client, col_base)
+def trouver_client(client_name, df):
+    """Retourne le dataframe filtré pour le client choisi."""
+    if df is None:
+        return pd.DataFrame()
+    df = df.copy()
+    df["Etablissement"] = df["Etablissement"].astype(str).str.strip()
+    return df[df["Etablissement"].str.lower() == client_name.strip().lower()].copy()
+
 def generer_facture_pdf(employe_dict, nom_fichier):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
@@ -344,10 +353,10 @@ if CLIENTS_FILE.exists():
         clients_list = json.load(f)
 else:
     clients_list = [
-       "Abbott", "Samsung", "Henkel", "G+D", "Maersk",
-        "Cahors", "PMi", "Siemens", "Syngenta", "LG",
+       "Abbott", "Samsung", "henkel", "G+D", "Maersk",
+        "Cahors", "PMi", "Simens", "Syngenta", "LG",
         "Epson", "EsteL", "JTI", "Siemens Energy", "Wilhelmsen",
-        "Healthineers", "Contrat auto-entrepreneur", "Coca cola", "IPSEN", "SOGEREC","CCIS ex SOGEREC",
+        "Healthiniers", "Contrat auto-entrepreneur", "Coca-Cola", "IPSEN", "SOGEREC","CCIS ex SOGEREC",
         "Roche", "Tango", "VARION"
     ]
     with open(CLIENTS_FILE, "w", encoding="utf-8") as f:
@@ -423,10 +432,14 @@ if st.session_state.selected_client:
     if st.session_state.full_df is not None:
         df = st.session_state.full_df.copy()
         df["Etablissement"] = df["Etablissement"].astype(str).str.strip()
-        df_client = df[df["Etablissement"] == st.session_state.selected_client.strip()].copy()
+        df_client = trouver_client(st.session_state.selected_client, df)
+
         st.session_state.data[st.session_state.selected_client] = df_client.to_dict(orient="records")
 
         if not df_client.empty:
+            # ------------------------------------------------
+            # 🔹 Partie calculs et préparation des données
+            # ------------------------------------------------
             mois_possibles = [mois.lower() for mois in calendar.month_name if mois]
             colonnes_mois = [col for col in df_client.columns if any(mois in col.lower() for mois in mois_possibles)]
             st.success(f"{len(df_client)} employés trouvés.")
@@ -608,66 +621,32 @@ if st.session_state.selected_client:
             tva_multiplicateur = 1+ (tva_tarif/100)
             df_client["Facture TVA"] = df_client["Facture HT"] * tva_multiplicateur
            
-            st.write(df_client.head())
+            st.write(df_client.head()) # On peut encapsuler ton code de calculs dans une fonction
+            # df_client = employe_data["df_client"]     # Le dataframe mis à jour avec toutes les colonnes calculées
 
-# Construire employe_data APRÈS les calculs
-            employe_data = []
-            mois_possibles = [mois.lower() for mois in calendar.month_name if mois]
-            colonnes_mois = [col for col in df_client.columns if any(m in col.lower() for m in mois_possibles)]
-
-            for _, row in df_client.iterrows():
-                data_dict = row.to_dict()
-                data_dict["Mois"] = colonnes_mois
-
-                # Prendre les valeurs calculées de df_client pour chaque ligne
-                data_dict["data"] = {
-                    ligne: [row.get(ligne, "") for _ in colonnes_mois]
-                    for ligne in [
-                        "Salaire de base calcule", "Prime mensuelle calcule", "IFSP (20% du salaire de base)",
-                        "Prime exeptionnelle (10%) (DZD)", "Frais remboursement calcule",
-                        "Indemnité de panier calcule", "Indemnité de transport calcule", "Prime vestimentaire (DZD)",
-                        "Base cotisable","Base imposable au baréme", "IRG barème", "IRG 10%", "Salaire brut",
-                        "Retenue CNAS employé", "Salaire net", "CNAS employeur",
-                        "Cotisation œuvre sociale", "Taxe formation","Taxe formation et os", "Masse salariale",
-                        "Coût congé payé", "Coût salaire", "Facture HT","Facture TVA"
-                    ]
-                }
-                employe_data.append(data_dict)
-
+            # ------------------------------------------------
+            # 📥 Génération et téléchargement Excel
+            # ------------------------------------------------
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 df_client.to_excel(writer, index=False, sheet_name='Calculs')
-                
                 workbook = writer.book
                 worksheet = writer.sheets['Calculs']
 
-                # 🎨 Style d'entête
+                # Style entête
                 header_format = workbook.add_format({
-                    'bold': True,
-                    'text_wrap': True,
-                    'valign': 'middle',
-                    'align': 'center',
-                    'fg_color': '#0a5275',
-                    'font_color': 'white',
-                    'border': 1
+                    'bold': True, 'text_wrap': True, 'valign': 'middle',
+                    'align': 'center', 'fg_color': '#0a5275',
+                    'font_color': 'white', 'border': 1
                 })
-
-                # Appliquer style entête
                 for col_num, value in enumerate(df_client.columns.values):
                     worksheet.write(0, col_num, value, header_format)
 
-                # 📌 Ajuster largeur colonnes
+                # Ajuster largeur colonnes
                 for i, col in enumerate(df_client.columns):
                     col_width = max(df_client[col].astype(str).map(len).max(), len(col)) + 2
                     worksheet.set_column(i, i, col_width)
 
-                # 💰 Format monétaire pour colonnes DZD
-                money_format = workbook.add_format({'num_format': '#,##0.00 DZD', 'border': 1})
-                for i, col in enumerate(df_client.columns):
-                    if "DZD" in col or "Salaire" in col or "Coût" in col or "Facture" in col:
-                        worksheet.set_column(i, i, None)
-
-            # 📥 Bouton de téléchargement Excel
             st.download_button(
                 label="📊 Télécharger les résultats en Excel",
                 data=output.getvalue(),
@@ -675,6 +654,9 @@ if st.session_state.selected_client:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
+            # ------------------------------------------------
+            # 📥 Génération et téléchargement PDF par employé
+            # ------------------------------------------------
             st.markdown("### 📥 Télécharger la facture PDF par employé")
             for idx, row in df_client.iterrows():
                 nom = str(row.get("Nom", f"employe_{idx}")).strip().replace(" ", "_")
@@ -687,9 +669,7 @@ if st.session_state.selected_client:
                     mime="application/pdf",
                     key=f"pdf_{matricule}_{idx}"
                 )
-
         else:
             st.warning("⚠️ Aucun employé trouvé pour ce client ")
-          
     else:
         st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
