@@ -22,6 +22,7 @@ import io
 from decimal import Decimal
 from pathlib import Path
 from rapidfuzz import process, fuzz
+from reportlab.platypus import Image
 # 📷 Afficher un logo
 st.set_page_config(
     page_title="Gestion de la Facturation",
@@ -254,20 +255,32 @@ def trouver_client(client_name, df):
     df = df.copy()
     df["Etablissement"] = df["Etablissement"].astype(str).str.strip()
     return df[df["Etablissement"].str.lower() == client_name.strip().lower()].copy()
+from reportlab.platypus import Image, Table, TableStyle, Spacer, Paragraph
+from reportlab.lib.utils import ImageReader
+from reportlab.lib import colors
+def _make_image_flowable(path, target_height):
+    """Retourne un Image flowable redimensionné en conservant le ratio.
+       Si le fichier n'existe pas, retourne un Spacer de la même hauteur."""
+    if not path or not os.path.exists(path):
+        return Spacer(1, target_height)
+    try:
+        img = ImageReader(path)
+        iw, ih = img.getSize()
+        ratio = target_height / ih
+        width = iw * ratio
+        return Image(path, width=width, height=target_height)
+    except Exception as e:
+        print(f"⚠ Impossible de charger l'image {path}: {e}")
+        return Spacer(1, target_height)
+
 
 def generer_facture_pdf(employe_dict, nom_fichier):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     elements = []
 
+    # 📌 Styles
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        'Title',
-        parent=styles['Heading1'],
-        fontSize=16,
-        textColor=colors.HexColor("#0a5275"),
-        spaceAfter=20,
-    )
     header_style = ParagraphStyle(
         'Header',
         parent=styles['Normal'],
@@ -275,56 +288,76 @@ def generer_facture_pdf(employe_dict, nom_fichier):
         spaceAfter=10,
     )
 
-    # 🧾 En-tête : infos employé
+    # 📌 Logos
+    logo_entreprise_path = "logo3.jpg"  # Ton logo principal
+    etablissement = str(employe_dict.get("Etablissement", "")).strip()
+    logo_etablissement_path = f"Logos/{etablissement}.png"
+
+    # Charger les images si elles existent
+    logo_entreprise = Image(logo_entreprise_path, width=80, height=80) if os.path.exists(logo_entreprise_path) else ""
+    logo_etablissement = Image(logo_etablissement_path, width=80, height=80) if os.path.exists(logo_etablissement_path) else ""
+
+    # 📌 Les mettre côte à côte dans une table
+    logos_table = Table(
+        [[logo_entreprise, "", logo_etablissement]],
+        colWidths=[80, 350, 80]  # Espace central pour séparer
+    )
+    logos_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+        ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    elements.append(logos_table)
+    elements.append(Spacer(1, 12))
+
+    # 📌 Infos employé
     header_info = f"""
     <b>Nom:</b> {employe_dict.get("Nom", "")}<br/>
     <b>Prénom:</b> {employe_dict.get("Prénom", "")}<br/>
     <b>Année:</b> {employe_dict.get("Année", "")}<br/>
     <b>Titre du poste:</b> {employe_dict.get("Titre du poste", "")}<br/>
     <b>Durée CDD:</b> {employe_dict.get("Durée du CDD (Mois)", "")}<br/>
-    <b>Établissement:</b> {employe_dict.get("Etablissement", "")}
+    <b>Établissement:</b> {etablissement}
     """
-    elements.append(Paragraph("🧾 Facture individuelle de l'employé", title_style))
     elements.append(Paragraph(header_info, header_style))
     elements.append(Spacer(1, 12))
 
-    # 📊 Lignes à afficher
+    # 📌 Tableau salaire
     lignes = [
         "Salaire de base calcule", "Prime mensuelle calcule", "IFSP (20% du salaire de base)",
         "Prime exeptionnelle (10%) (DZD)", "Frais remboursement calcule",
-        "Indemnité de panier calcule", "Indemnité de transport calcule", "Prime vestimentaire (DZD)","Indemnité 22jours",
-        "Base cotisable","Base imposable au baréme", "IRG barème", "IRG 10%", "Salaire brut",
-        "Retenue CNAS employé", "Salaire net", "CNAS employeur",
-        "Cotisation œuvre sociale", "Taxe formation", "Taxe formation et os", "Masse salariale",
-        "Coût congé payé", "Coût salaire", "Facture HT", "Facture TVA"
+        "Indemnité de panier calcule", "Indemnité de transport calcule", "Prime vestimentaire (DZD)",
+        "Indemnité 22jours", "Base cotisable", "Base imposable au baréme",
+        "IRG barème", "IRG 10%", "Salaire brut", "Retenue CNAS employé",
+        "Salaire net", "CNAS employeur", "Cotisation œuvre sociale", "Taxe formation",
+        "Taxe formation et os", "Masse salariale", "Coût congé payé",
+        "Coût salaire", "Facture HT", "Facture TVA"
     ]
 
     mois = employe_dict.get("Mois", [])
     if isinstance(mois, str):
         mois = [mois]
 
-    # 📊 Construction des données calculées
     tableau_data = [["Éléments"] + mois]
     for ligne in lignes:
         val = employe_dict.get(ligne, "")
         if isinstance(val, (int, float)):
-            val = f"{val:,.2f}".replace(",", " ").replace(".", ",")  # Format DZD
-        row = [ligne, val]
-        tableau_data.append(row)
+            val = f"{val:,.2f}".replace(",", " ").replace(".", ",")
+        tableau_data.append([ligne, val])
 
-    # 🧱 Table PDF
-    table = Table(tableau_data, hAlign='LEFT')
+    table = Table(tableau_data, colWidths=[300, 200], hAlign='CENTER')
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-        ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+        ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('FONTSIZE', (0, 0), (-1, -1), 12),
         ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
         ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
     ]))
-
     elements.append(table)
+
     doc.build(elements)
     pdf = buffer.getvalue()
     buffer.close()
@@ -353,10 +386,10 @@ if CLIENTS_FILE.exists():
         clients_list = json.load(f)
 else:
     clients_list = [
-       "Abbott", "Samsung", "henkel", "G+D", "Maersk",
-        "Cahors", "PMi", "Simens", "Syngenta", "LG",
+       "Abbott", "Samsung", "Henkel", "G+D", "Maersk",
+        "Cahors", "PMi", "Siemens", "Syngenta", "LG",
         "Epson", "EsteL", "JTI", "Siemens Energy", "Wilhelmsen",
-        "Healthiniers", "Contrat auto-entrepreneur", "Coca-Cola", "IPSEN", "SOGEREC","CCIS ex SOGEREC",
+        "Healthineers", "Contrat auto-entrepreneur", "Coca Cola", "IPSEN", "SOGEREC","CCIS ex SOGEREC",
         "Roche", "Tango", "VARION"
     ]
     with open(CLIENTS_FILE, "w", encoding="utf-8") as f:
@@ -631,7 +664,7 @@ if st.session_state.selected_client:
             tva_multiplicateur = 1+ (tva_tarif/100)
             df_client["Facture TVA"] = df_client["Facture HT"] * tva_multiplicateur
            
-            st.write(df_client.head(57)) # On peut encapsuler ton code de calculs dans une fonction
+            st.write(df_client.head(50)) # On peut encapsuler ton code de calculs dans une fonction
             
 
             # ------------------------------------------------
@@ -683,5 +716,4 @@ if st.session_state.selected_client:
             st.warning("⚠️ Aucun employé trouvé pour ce client ")
     else:
         st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
-
 
