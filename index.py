@@ -265,7 +265,7 @@ def generer_facture_pdf(employe_dict, nom_fichier):
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
         ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 12),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
         ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
         ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
     ]))
@@ -696,6 +696,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
