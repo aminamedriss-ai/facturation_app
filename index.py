@@ -491,7 +491,7 @@ else:
                     df_client["Jours de congé (Jour)"]
                 )
                 HEURES_MOIS = 173.33
-                df_client["Observation"] = Observation
+                
                 # 3. Calculs (une seule fois)
                 df_client["Salaire de base calcule"] = (get_valeur("Salaire de base (DZD)", "Nouveau Salaire de base (DZD)")+df_client["IFSP (20% du salaire de base)"])
                 df_client["Indemnité de panier calcule"] = get_valeur("Indemnité de panier (DZD)", "Nouvelle Indemnité de panier (DZD)")
@@ -643,7 +643,7 @@ else:
                 # df_client["Facture HT"] = (df_client["Coût salaire"] * fees_multiplicateur) + tap_tarif
                 tva_multiplicateur = 1+ (tva_tarif/100)
                 df_client["Facture TVA"] = df_client["Facture HT + NDF"] * tva_multiplicateur
-                
+                df_client["Observation"] = Observation
                 st.write(df_client.head(50)) # On peut encapsuler ton code de calculs dans une fonction
                 
 
@@ -696,6 +696,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
