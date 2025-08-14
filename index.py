@@ -456,7 +456,7 @@ else:
                     fees_etablissement_pct = st.number_input("Fees etalent (%)", min_value=0.0, max_value=100.0, step=5.0, value=0.0)
                     complementaire_sante_tarif = st.number_input("Complémentaire santé (DZD)", min_value=0.0, step=500.0, value=0.0)
                     phone = st.number_input("Frais téléphone", min_value=0.0, step=500.0, value=0.0)
-                    ndf = st.number_input("Frais téléphone", min_value=0.0, step=500.0, value=0.0)
+                    ndf = st.number_input("NDF", min_value=0.0, step=500.0, value=0.0)
                 with col2:
                     indemnite_moto_tarif = st.number_input("Indemnité moto (DZD)", min_value=0.0, step=500.0, value=0.0)
                     tap_tarif = st.number_input("TAP (DZD)", min_value=0.0, step=500.0, value=0.0)
