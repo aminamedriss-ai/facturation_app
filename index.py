@@ -376,7 +376,7 @@ else:
         key="client_select",
     )
     st.session_state.clients = clients_list
-
+    st.session_state.selected_client = client_name
     # 📁 Upload du fichier global
     st.sidebar.subheader("📅 Charger le fichier récapitulatif (tous les clients)")
     uploaded_csv = st.sidebar.file_uploader("Fichier CSV global", type=["csv"], key="csv_recap")
@@ -432,7 +432,7 @@ else:
 # 🧽 Sélection d'un client
 # st.subheader("Sélectionnez un client")
 # 🎯 Affichage des employés du client sélectionné
-st.session_state.selected_client = client_name
+# st.session_state.selected_client = client_name
 if st.session_state.selected_client:
     st.markdown(f"## 👤 Données des employés pour **{st.session_state.selected_client.strip()}**")
 
