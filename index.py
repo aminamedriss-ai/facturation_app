@@ -300,7 +300,7 @@ def logout():
     st.session_state["user"] = None
 
 # --- Interface ---
-st.title("🔐 Auth avec Supabase")
+# st.title("🔐 Auth avec Supabase")
 
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
@@ -329,10 +329,11 @@ if not st.session_state["authenticated"]:
                 st.error("❌ Email ou mot de passe incorrect.")
 
 else:
-    st.success(f"Bienvenue {st.session_state['user'].email} 👋")
-    if st.button("Se déconnecter"):
-        logout()
-        st.rerun()
+    with st.sidebar:
+        st.success(f"Bienvenue {st.session_state['user'].email} 👋")
+        if st.button("Se déconnecter"):
+            logout()
+            st.rerun()
 
 # 🎉 Application principale ici
 # st.title("Bienvenue sur l'application de calcule des factures")
