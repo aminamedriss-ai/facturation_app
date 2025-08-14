@@ -23,6 +23,7 @@ from decimal import Decimal
 from pathlib import Path
 from rapidfuzz import process, fuzz
 from reportlab.platypus import Image
+from supabase import create_client, Client
 # 📷 Afficher un logo
 st.set_page_config(
     page_title="Gestion de la Facturation",
@@ -135,89 +136,61 @@ st.markdown(
     unsafe_allow_html=True
 )
 USERS_FILE = "users.json"
-
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 # 🔒 Hachage du mot de passe
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 🔄 Charger les utilisateurs depuis le fichier JSON
-def load_users():
-    if os.path.exists(USERS_FILE):
-        with open(USERS_FILE, "r") as f:
-            return json.load(f)
-    return {}
+# 📝 Inscription
+def signup(email, password):
+    response = supabase.auth.sign_up({"email": email, "password": password})
+    return response
 
-# 💾 Sauvegarder les utilisateurs dans le fichier
-def save_users(users):
-    with open(USERS_FILE, "w") as f:
-        json.dump(users, f)
+# 🔐 Connexion
+def login(email, password):
+    response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+    return response
 
-# 📝 Interface d'inscription
-def signup():
-    st.subheader("Créer un compte")
-    username = st.text_input("Nom d'utilisateur")
-    password = st.text_input("Mot de passe", type="password")
-    confirm = st.text_input("Confirmer le mot de passe", type="password")
-
-    if st.button("Créer le compte"):
-        if password != confirm:
-            st.error("❌ Les mots de passe ne correspondent pas.")
-            return
-
-        users = load_users()
-        if username in users:
-            st.error("❌ Nom d'utilisateur déjà existant.")
-        else:
-            users[username] = hash_password(password)
-            save_users(users)
-            st.success("✅ Compte créé avec succès. Connectez-vous maintenant.")
-            st.session_state["auth_mode"] = "login"
-            st.rerun()
-
-# 🔐 Interface de connexion
-def login():
-    st.subheader("Se connecter")
-    username = st.text_input("Nom d'utilisateur")
-    password = st.text_input("Mot de passe", type="password")
-
-    if st.button("Connexion"):
-        users = load_users()
-        if username in users and users[username] == hash_password(password):
-            st.session_state["authenticated"] = True
-            st.session_state["username"] = username
-            st.success(f"Bienvenue {username} 👋")
-            st.rerun()
-        else:
-            st.error("❌ Nom d'utilisateur ou mot de passe incorrect.")
-
-# 🔓 Déconnexion
+# 🚪 Déconnexion
 def logout():
-    if st.sidebar.button("Se déconnecter"):
-        st.session_state["authenticated"] = False
-        st.session_state["username"] = ""
-        st.rerun()
+    supabase.auth.sign_out()
+    st.session_state["authenticated"] = False
+    st.session_state["user"] = None
 
-# 🔄 Initialiser l'état
+# --- Interface ---
+st.title("🔐 Auth avec Supabase")
+
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
-    st.session_state["auth_mode"] = "login"
 
-# 🔏 Si l'utilisateur n'est pas connecté, afficher l'interface d'authentification
 if not st.session_state["authenticated"]:
-    st.sidebar.title("🔐 Authentification")
-    auth_mode = st.sidebar.radio("Choisissez une option :", ["Se connecter", "Créer un compte"])
-    st.session_state["auth_mode"] = "login" if auth_mode == "Se connecter" else "signup"
+    mode = st.radio("Choisissez :", ["Connexion", "Créer un compte"])
 
-    if st.session_state["auth_mode"] == "login":
-        login()
+    email = st.text_input("Email")
+    password = st.text_input("Mot de passe", type="password")
+
+    if mode == "Créer un compte":
+        if st.button("Créer un compte"):
+            res = signup(email, password)
+            if res.user:
+                st.success("✅ Compte créé ! Vérifie ton email.")
+            else:
+                st.error(f"Erreur : {res}")
     else:
-        signup()
+        if st.button("Connexion"):
+            res = login(email, password)
+            if res.user:
+                st.session_state["authenticated"] = True
+                st.session_state["user"] = res.user
+                st.rerun()
+            else:
+                st.error("❌ Email ou mot de passe incorrect.")
 
-    st.stop()
-
-# ✅ Si connecté, continuer l'application principale
-# st.sidebar.success(f"Connecté en tant que **{st.session_state['username']}**")
-logout()
+else:
+    st.success(f"Bienvenue {st.session_state['user'].email} 👋")
+    if st.button("Se déconnecter"):
+        logout()
+        st.rerun()
 
 # 🎉 Application principale ici
 # st.title("Bienvenue sur l'application de calcule des factures")
@@ -291,7 +264,7 @@ def generer_facture_pdf(employe_dict, nom_fichier):
     # 📌 Logos
     logo_entreprise_path = "logo3.jpg"  # Ton logo principal
     etablissement = str(employe_dict.get("Etablissement", "")).strip()
-    logo_etablissement_path = f"facturation_app/Logos/{etablissement}.png"
+    logo_etablissement_path = f"Logos/{etablissement}.png"
 
     # Charger les images si elles existent
     logo_entreprise = Image(logo_entreprise_path, width=80, height=80) if os.path.exists(logo_entreprise_path) else ""
@@ -716,5 +689,4 @@ if st.session_state.selected_client:
             st.warning("⚠️ Aucun employé trouvé pour ce client ")
     else:
         st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
-
 
