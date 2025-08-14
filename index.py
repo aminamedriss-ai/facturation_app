@@ -135,66 +135,6 @@ st.markdown(
     "<h1 style='text-align: center;'>Bienvenue sur l'application de calcul des factures</h1>",
     unsafe_allow_html=True
 )
-USERS_FILE = "users.json"
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-# 🔒 Hachage du mot de passe
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-# 📝 Inscription
-def signup(email, password):
-    response = supabase.auth.sign_up({"email": email, "password": password})
-    return response
-
-# 🔐 Connexion
-def login(email, password):
-    response = supabase.auth.sign_in_with_password({"email": email, "password": password})
-    return response
-
-# 🚪 Déconnexion
-def logout():
-    supabase.auth.sign_out()
-    st.session_state["authenticated"] = False
-    st.session_state["user"] = None
-
-# --- Interface ---
-st.title("🔐 Auth avec Supabase")
-
-if "authenticated" not in st.session_state:
-    st.session_state["authenticated"] = False
-
-if not st.session_state["authenticated"]:
-    mode = st.radio("Choisissez :", ["Connexion", "Créer un compte"])
-
-    email = st.text_input("Email")
-    password = st.text_input("Mot de passe", type="password")
-
-    if mode == "Créer un compte":
-        if st.button("Créer un compte"):
-            res = signup(email, password)
-            if res.user:
-                st.success("✅ Compte créé ! Vérifie ton email.")
-            else:
-                st.error(f"Erreur : {res}")
-    else:
-        if st.button("Connexion"):
-            res = login(email, password)
-            if res.user:
-                st.session_state["authenticated"] = True
-                st.session_state["user"] = res.user
-                st.rerun()
-            else:
-                st.error("❌ Email ou mot de passe incorrect.")
-
-else:
-    st.success(f"Bienvenue {st.session_state['user'].email} 👋")
-    if st.button("Se déconnecter"):
-        logout()
-        st.rerun()
-
-# 🎉 Application principale ici
-# st.title("Bienvenue sur l'application de calcule des factures")
-
 def nettoyer_colonne(df, col):
     return (
         df[col]
@@ -337,95 +277,156 @@ def generer_facture_pdf(employe_dict, nom_fichier):
     return pdf
 
 
+USERS_FILE = "users.json"
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+# 🔒 Hachage du mot de passe
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# 📝 Inscription
+def signup(email, password):
+    response = supabase.auth.sign_up({"email": email, "password": password})
+    return response
 
-# 📌 Initialisation
-if "clients" not in st.session_state:
-    st.session_state.clients = []
-if "selected_client" not in st.session_state:
-    st.session_state.selected_client = None
-if "full_df" not in st.session_state:
-    st.session_state.full_df = None
-if "data" not in st.session_state:
-    st.session_state.data = {}
+# 🔐 Connexion
+def login(email, password):
+    response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+    return response
 
+# 🚪 Déconnexion
+def logout():
+    supabase.auth.sign_out()
+    st.session_state["authenticated"] = False
+    st.session_state["user"] = None
 
-CLIENTS_FILE = Path("clients.json")
-# st.title("👥 Gestion des clients et des employés")
+# --- Interface ---
+st.title("🔐 Auth avec Supabase")
 
-# 📂 Charger la liste des clients
-if CLIENTS_FILE.exists():
-    with open(CLIENTS_FILE, "r", encoding="utf-8") as f:
-        clients_list = json.load(f)
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+
+if not st.session_state["authenticated"]:
+    mode = st.radio("Choisissez :", ["Connexion", "Créer un compte"])
+
+    email = st.text_input("Email")
+    password = st.text_input("Mot de passe", type="password")
+
+    if mode == "Créer un compte":
+        if st.button("Créer un compte"):
+            res = signup(email, password)
+            if res.user:
+                st.success("✅ Compte créé ! Vérifie ton email.")
+            else:
+                st.error(f"Erreur : {res}")
+    else:
+        if st.button("Connexion"):
+            res = login(email, password)
+            if res.user:
+                st.session_state["authenticated"] = True
+                st.session_state["user"] = res.user
+                st.rerun()
+            else:
+                st.error("❌ Email ou mot de passe incorrect.")
+
 else:
-    clients_list = [
-       "Abbott", "Samsung", "Henkel", "G+D", "Maersk",
-        "Cahors", "PMi", "Siemens", "Syngenta", "LG",
-        "Epson", "EsteL", "JTI", "Siemens Energy", "Wilhelmsen",
-        "Healthineers", "Contrat auto-entrepreneur", "Coca Cola", "IPSEN", "SOGEREC","CCIS ex SOGEREC",
-        "Roche", "Tango", "VARION"
-    ]
-    with open(CLIENTS_FILE, "w", encoding="utf-8") as f:
-        json.dump(clients_list, f, ensure_ascii=False, indent=2)
-client_name = st.sidebar.selectbox(
-    "Sélectionner un client",
-    options=clients_list,
-    index=None,  # <-- pas de sélection initiale
-    placeholder="— Sélectionner un client —",
-    key="client_select",
-)
-st.session_state.clients = clients_list
+    st.success(f"Bienvenue {st.session_state['user'].email} 👋")
+    if st.button("Se déconnecter"):
+        logout()
+        st.rerun()
 
-# 📁 Upload du fichier global
-st.sidebar.subheader("📅 Charger le fichier récapitulatif (tous les clients)")
-uploaded_csv = st.sidebar.file_uploader("Fichier CSV global", type=["csv"], key="csv_recap")
+# 🎉 Application principale ici
+# st.title("Bienvenue sur l'application de calcule des factures")
 
-if uploaded_csv is not None:
-    try:
-        df_full = pd.read_csv(uploaded_csv, skiprows=2, decimal=",", thousands=" ") 
-        st.write(df_full.head())
-        st.session_state.full_df = df_full
-        st.sidebar.success("✅ Fichier chargé avec succès !")
-    except Exception as e:
-        st.sidebar.error(f"❌ Erreur : {e}")
 
-# ➕ Ajouter un nouveau client
-st.sidebar.subheader("➕ Ajouter un nouveau client")
-new_client = st.sidebar.text_input("Nom du nouveau client")
-if st.sidebar.button("Ajouter"):
-    if new_client and new_client not in st.session_state.clients:
-        st.session_state.clients.append(new_client)
+
+
+    # 📌 Initialisation
+    if "clients" not in st.session_state:
+        st.session_state.clients = []
+    if "selected_client" not in st.session_state:
+        st.session_state.selected_client = None
+    if "full_df" not in st.session_state:
+        st.session_state.full_df = None
+    if "data" not in st.session_state:
+        st.session_state.data = {}
+
+
+    CLIENTS_FILE = Path("clients.json")
+    # st.title("👥 Gestion des clients et des employés")
+
+    # 📂 Charger la liste des clients
+    if CLIENTS_FILE.exists():
+        with open(CLIENTS_FILE, "r", encoding="utf-8") as f:
+            clients_list = json.load(f)
+    else:
+        clients_list = [
+        "Abbott", "Samsung", "Henkel", "G+D", "Maersk",
+            "Cahors", "PMi", "Siemens", "Syngenta", "LG",
+            "Epson", "EsteL", "JTI", "Siemens Energy", "Wilhelmsen",
+            "Healthineers", "Contrat auto-entrepreneur", "Coca Cola", "IPSEN", "SOGEREC","CCIS ex SOGEREC",
+            "Roche", "Tango", "VARION"
+        ]
         with open(CLIENTS_FILE, "w", encoding="utf-8") as f:
-            json.dump(st.session_state.clients, f, ensure_ascii=False, indent=2)
-        st.sidebar.success(f"Client '{new_client}' ajouté !")
+            json.dump(clients_list, f, ensure_ascii=False, indent=2)
+    client_name = st.sidebar.selectbox(
+        "Sélectionner un client",
+        options=clients_list,
+        index=None,  # <-- pas de sélection initiale
+        placeholder="— Sélectionner un client —",
+        key="client_select",
+    )
+    st.session_state.clients = clients_list
 
-# 🗑️ Supprimer un client avec confirmation
-st.sidebar.subheader("🗑️ Supprimer un client")
-client_to_delete = st.sidebar.selectbox("Choisir le client à supprimer", [""] + st.session_state.clients)
+    # 📁 Upload du fichier global
+    st.sidebar.subheader("📅 Charger le fichier récapitulatif (tous les clients)")
+    uploaded_csv = st.sidebar.file_uploader("Fichier CSV global", type=["csv"], key="csv_recap")
 
-# Variable temporaire pour confirmation
-if "confirm_delete" not in st.session_state:
-    st.session_state.confirm_delete = None
+    if uploaded_csv is not None:
+        try:
+            df_full = pd.read_csv(uploaded_csv, skiprows=2, decimal=",", thousands=" ") 
+            st.write(df_full.head())
+            st.session_state.full_df = df_full
+            st.sidebar.success("✅ Fichier chargé avec succès !")
+        except Exception as e:
+            st.sidebar.error(f"❌ Erreur : {e}")
 
-if st.sidebar.button("Supprimer"):
-    if client_to_delete and client_to_delete in st.session_state.clients:
-        st.session_state.confirm_delete = client_to_delete  # on garde le nom en mémoire
-
-# Si un client est en attente de confirmation
-if st.session_state.confirm_delete:
-    st.warning(f"⚠️ Êtes-vous sûr de vouloir supprimer le client '{st.session_state.confirm_delete}' ?")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("✅ Oui, supprimer"):
-            st.session_state.clients.remove(st.session_state.confirm_delete)
+    # ➕ Ajouter un nouveau client
+    st.sidebar.subheader("➕ Ajouter un nouveau client")
+    new_client = st.sidebar.text_input("Nom du nouveau client")
+    if st.sidebar.button("Ajouter"):
+        if new_client and new_client not in st.session_state.clients:
+            st.session_state.clients.append(new_client)
             with open(CLIENTS_FILE, "w", encoding="utf-8") as f:
                 json.dump(st.session_state.clients, f, ensure_ascii=False, indent=2)
-            st.success(f"Client '{st.session_state.confirm_delete}' supprimé avec succès !")
-            st.session_state.confirm_delete = None  # reset
-    with col2:
-        if st.button("❌ Annuler"):
-            st.info("Suppression annulée.")
-            st.session_state.confirm_delete = None
+            st.sidebar.success(f"Client '{new_client}' ajouté !")
+
+    # 🗑️ Supprimer un client avec confirmation
+    st.sidebar.subheader("🗑️ Supprimer un client")
+    client_to_delete = st.sidebar.selectbox("Choisir le client à supprimer", [""] + st.session_state.clients)
+
+    # Variable temporaire pour confirmation
+    if "confirm_delete" not in st.session_state:
+        st.session_state.confirm_delete = None
+
+    if st.sidebar.button("Supprimer"):
+        if client_to_delete and client_to_delete in st.session_state.clients:
+            st.session_state.confirm_delete = client_to_delete  # on garde le nom en mémoire
+
+    # Si un client est en attente de confirmation
+    if st.session_state.confirm_delete:
+        st.warning(f"⚠️ Êtes-vous sûr de vouloir supprimer le client '{st.session_state.confirm_delete}' ?")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("✅ Oui, supprimer"):
+                st.session_state.clients.remove(st.session_state.confirm_delete)
+                with open(CLIENTS_FILE, "w", encoding="utf-8") as f:
+                    json.dump(st.session_state.clients, f, ensure_ascii=False, indent=2)
+                st.success(f"Client '{st.session_state.confirm_delete}' supprimé avec succès !")
+                st.session_state.confirm_delete = None  # reset
+        with col2:
+            if st.button("❌ Annuler"):
+                st.info("Suppression annulée.")
+                st.session_state.confirm_delete = None
 
 
 # 🧽 Sélection d'un client
