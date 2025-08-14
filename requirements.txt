@@ -5,3 +5,4 @@ reportlab
 bcrypt
 xlsxwriter
 rapidfuzz
+supabase 
