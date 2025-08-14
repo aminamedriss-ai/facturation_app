@@ -259,7 +259,7 @@ def generer_facture_pdf(employe_dict, nom_fichier):
             val = f"{val:,.2f}".replace(",", " ").replace(".", ",")
         tableau_data.append([ligne, val])
 
-    table = Table(tableau_data, colWidths=[300, 200], hAlign='CENTER')
+    table = Table(tableau_data, colWidths=[200, 100], hAlign='CENTER')
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
@@ -696,6 +696,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
