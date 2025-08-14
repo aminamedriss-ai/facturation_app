@@ -220,6 +220,7 @@ def generer_facture_pdf(employe_dict, nom_fichier):
         ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), -20),  # 🔥 Décale vers le haut
     ]))
     elements.append(logos_table)
     elements.append(Spacer(1, 12))
@@ -259,13 +260,13 @@ def generer_facture_pdf(employe_dict, nom_fichier):
             val = f"{val:,.2f}".replace(",", " ").replace(".", ",")
         tableau_data.append([ligne, val])
 
-    table = Table(tableau_data, colWidths=[200, 100], hAlign='CENTER')
+    table = Table(tableau_data, colWidths=[300, 200], hAlign='CENTER')
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
         ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('FONTSIZE', (0, 0), (-1, -1), 12),
         ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
         ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
     ]))
@@ -696,6 +697,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
