@@ -491,6 +491,7 @@ else:
                     df_client["Jours de congé (Jour)"]
                 )
                 HEURES_MOIS = 173.33
+                df_client["Observation"] = Observation
                 # 3. Calculs (une seule fois)
                 df_client["Salaire de base calcule"] = (get_valeur("Salaire de base (DZD)", "Nouveau Salaire de base (DZD)")+df_client["IFSP (20% du salaire de base)"])
                 df_client["Indemnité de panier calcule"] = get_valeur("Indemnité de panier (DZD)", "Nouvelle Indemnité de panier (DZD)")
@@ -695,6 +696,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
