@@ -204,7 +204,7 @@ def generer_facture_pdf(employe_dict, nom_fichier):
     # 📌 Logos
     logo_entreprise_path = "logo3.jpg"  # Ton logo principal
     etablissement = str(employe_dict.get("Etablissement", "")).strip()
-    logo_etablissement_path = f"facturation_app/Logos/{etablissement}.png"
+    logo_etablissement_path = f"Logos/{etablissement}.png"
 
     # Charger les images si elles existent
     logo_entreprise = Image(logo_entreprise_path, width=80, height=80) if os.path.exists(logo_entreprise_path) else ""
@@ -245,7 +245,7 @@ def generer_facture_pdf(employe_dict, nom_fichier):
         "IRG barème", "IRG 10%", "Salaire brut", "Retenue CNAS employé",
         "Salaire net", "CNAS employeur", "Cotisation œuvre sociale", "Taxe formation",
         "Taxe formation et os", "Masse salariale", "Coût congé payé",
-        "Coût salaire", "Facture HT", "Facture TVA"
+        "Coût salaire", "Facture HT","NDF" ,"Facture HT + NDF","Facture TVA"
     ]
 
     mois = employe_dict.get("Mois", [])
@@ -456,7 +456,7 @@ else:
                     fees_etablissement_pct = st.number_input("Fees etalent (%)", min_value=0.0, max_value=100.0, step=5.0, value=0.0)
                     complementaire_sante_tarif = st.number_input("Complémentaire santé (DZD)", min_value=0.0, step=500.0, value=0.0)
                     phone = st.number_input("Frais téléphone", min_value=0.0, step=500.0, value=0.0)
-
+                    ndf = st.number_input("Frais téléphone", min_value=0.0, step=500.0, value=0.0)
                 with col2:
                     indemnite_moto_tarif = st.number_input("Indemnité moto (DZD)", min_value=0.0, step=500.0, value=0.0)
                     tap_tarif = st.number_input("TAP (DZD)", min_value=0.0, step=500.0, value=0.0)
@@ -575,7 +575,7 @@ else:
                     df_client["Cotisation œuvre sociale"] +
                     df_client["Taxe formation"]
                 )
-                
+                df_client["NDF"] = ndf
                 if df_client["Etablissement"].iloc[0] == "Henkel":
                     df_client["Coût salaire"] = (
                         df_client["Salaire net"]
@@ -588,7 +588,8 @@ else:
                     )
                     df_client["Coût congé payé"] = df_client["Coût salaire"] / 30 * 2.5
                     fees_multiplicateur = 1 + (fees_etablissement_pct / 100)
-                    df_client["Facture HT"] = ((df_client["Coût salaire"] + df_client["Coût congé payé"]+ tap_tarif)* fees_multiplicateur) 
+                    df_client["Facture HT"] = ((df_client["Coût salaire"] + df_client["Coût congé payé"]+ tap_tarif)* fees_multiplicateur)
+                    df_client["Facture HT + NDF"] = df_client["Facture HT"]+ndf
                 elif df_client["Etablissement"].iloc[0] == "LG":
                     df_client["Coût salaire"] = (
                         df_client["Salaire net"]
@@ -601,7 +602,8 @@ else:
                         + phone
                     )
                     fees_multiplicateur = 1 + (fees_etablissement_pct / 100)
-                    df_client["Facture HT"] = (df_client["Coût salaire"] * fees_multiplicateur) + tap_tarif
+                    df_client["Facture HT"] = ((df_client["Coût salaire"] * fees_multiplicateur) + tap_tarif)
+                    df_client["Facture HT + NDF"] = df_client["Facture HT"]+ndf
                 elif df_client["Etablissement"].iloc[0] == "Maersk":
                     df_client["Coût salaire"] = (
                         df_client["Salaire net"]
@@ -615,10 +617,12 @@ else:
                     df_client["Coût congé payé"] = df_client["Coût salaire"] / 30 * 2.5
                     fees_multiplicateur = 1 + (fees_etablissement_pct / 100)
                     df_client["Facture HT"] = ((df_client["Coût salaire"] + df_client["Coût congé payé"]+ tap_tarif)* fees_multiplicateur) 
+                    df_client["Facture HT + NDF"] = df_client["Facture HT"]+ndf
                 elif df_client["Etablissement"].iloc[0] == "G+D":
                     df_client["Coût salaire"] = df_client["Salaire de base calcule"] + df_client["Indemnité de panier calcule"] + df_client["Indemnité de transport calcule"] +df_client["Prime vestimentaire (DZD)"]+df_client["Frais remboursement calcule"]+df_client["Prime exeptionnelle (10%) (DZD)"]
                     fees_multiplicateur = 1 + (fees_etablissement_pct / 100)
-                    df_client["Facture HT"] = (df_client["Coût salaire"] * fees_multiplicateur) + tap_tarif
+                    df_client["Facture HT"] = ((df_client["Coût salaire"] * fees_multiplicateur) + tap_tarif)
+                    df_client["Facture HT + NDF"] = df_client["Facture HT"]+ndf
                 else:
                     df_client["Coût congé payé"] = df_client["Masse salariale"] * (2.5 / 30)
                     df_client["Coût salaire"] = (
@@ -629,16 +633,16 @@ else:
                         + phone
                     )
                     fees_multiplicateur = 1 + (fees_etablissement_pct / 100)
-                    df_client["Facture HT"] = (df_client["Coût salaire"] * fees_multiplicateur) + tap_tarif
-
+                    df_client["Facture HT"] = ((df_client["Coût salaire"] * fees_multiplicateur) + tap_tarif)
+                    df_client["Facture HT + NDF"] = df_client["Facture HT"]+ndf
             
 
 
                 # fees_multiplicateur = 1 + (fees_etablissement_pct / 100)
                 # df_client["Facture HT"] = (df_client["Coût salaire"] * fees_multiplicateur) + tap_tarif
                 tva_multiplicateur = 1+ (tva_tarif/100)
-                df_client["Facture TVA"] = df_client["Facture HT"] * tva_multiplicateur
-            
+                df_client["Facture TVA"] = df_client["Facture HT + NDF"] * tva_multiplicateur
+                
                 st.write(df_client.head(50)) # On peut encapsuler ton code de calculs dans une fonction
                 
 
@@ -691,5 +695,4 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
-
 
