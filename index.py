@@ -451,7 +451,7 @@ else:
                 mois_possibles = [mois.lower() for mois in calendar.month_name if mois]
                 colonnes_mois = [col for col in df_client.columns if any(mois in col.lower() for mois in mois_possibles)]
                 st.success(f"{len(df_client)} employés trouvés.")
-                col1, col2, col3, col4 = st.columns(4)
+                col1, col2, col3= st.columns(3)
                 with col1:
                     fees_etablissement_pct = st.number_input("Fees etalent (%)", min_value=0.0, max_value=100.0, step=5.0, value=0.0)
                     complementaire_sante_tarif = st.number_input("Complémentaire santé (DZD)", min_value=0.0, step=500.0, value=0.0)
@@ -467,8 +467,7 @@ else:
                     frais_divers_tarif = st.number_input("Frais divers + transport (Yassir) (DZD)", min_value=0.0, step=500.0, value=0.0)
                     augmentation = st.number_input("Augmentation (%)", min_value=0.0, max_value=100.0, step=10.0, value=0.0)
                     jours_mois = st.number_input("Jours mois", min_value=28.0, max_value=31.0, step=1.0, value=30.0)
-                with col4:
-                    Observation = st.text_area("Observation", value="", height=100)
+                Observation = st.text_input("Observation", value="")
                 # 2. Nettoyage des colonnes
                 cols_to_float = [
                     "Salaire de base (DZD)", "Prime mensuelle (Barème) (DZD)", "IFSP (20% du salaire de base)",
@@ -696,6 +695,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
