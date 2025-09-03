@@ -1092,20 +1092,21 @@ else:
                 
                 # 1. On définit les colonnes fixes (identité employé)
                 # Colonnes fixes (identité employé)
-                mois_ordre = {
-    "Janvier": "-janv.-",
-    "Février": "-févr.-",
-    "Mars": "-mars-",
-    "Avril": "-avr.-",
-    "Mai": "-mai-",
-    "Juin": "-juin-",
-    "Juillet": "-juil.-",
-    "Août": "-août-",
-    "Septembre": "-sept.-",
-    "Octobre": "-oct.-",
-    "Novembre": "-nov.-",
-    "Décembre": "-déc.-"
-}
+                mois_ordre ={
+                    "-janv.-": "Janvier",
+                    "-févr.-": "Février",
+                    "-mars-": "Mars",
+                    "-avr.-": "Avril",
+                    "-mai-": "Mai",
+                    "-juin-": "Juin",
+                    "-juil.-": "Juillet",
+                    "-août-": "Août",
+                    "-sept.-": "Septembre",
+                    "-oct.-": "Octobre",
+                    "-nov.-": "Novembre",
+                    "-déc.-": "Décembre"
+                }
+
 
                 id_cols = ["Nom", "Prénom", "N°", "Titre du poste", "Durée du CDD (Mois)", "Etablissement", "Année"]
 
@@ -1197,6 +1198,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
