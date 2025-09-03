@@ -1170,7 +1170,7 @@ else:
                     st.download_button(
                         label=f"📊 {nom}",
                         data=excel_data,
-                        file_name=f"{matricule}_{nom}_facture.xlsx",
+                        file_name=f"{nom}_facture.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key=f"excel_{matricule}_{idx}"
                     )
@@ -1184,6 +1184,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
