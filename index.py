@@ -24,8 +24,7 @@ from pathlib import Path
 from rapidfuzz import process, fuzz
 from reportlab.platypus import Image
 from supabase import create_client, Client
-from PIL import Image  
-import pytesseract
+from PIL import Image 
 import easyocr
 import pandas as pd
 from openpyxl import Workbook
@@ -1494,3 +1493,4 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
