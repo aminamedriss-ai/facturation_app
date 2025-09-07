@@ -7,3 +7,5 @@ xlsxwriter
 rapidfuzz
 supabase 
 openpyxl
+pytesseract
+easyocr
