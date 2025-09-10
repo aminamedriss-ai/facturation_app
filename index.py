@@ -1,3 +1,4 @@
+import requests
 import streamlit as st
 import pandas as pd
 import datetime
@@ -24,22 +25,9 @@ from pathlib import Path
 from rapidfuzz import process, fuzz
 from reportlab.platypus import Image
 from supabase import create_client, Client
-from PIL import Image 
+from PIL import Image  
+import pytesseract
 import easyocr
-import pandas as pd
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
-import os
-from openpyxl.drawing.image import Image as XLImage
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
-from openpyxl.utils import get_column_letter
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
-from openpyxl.utils import get_column_letter
-from openpyxl.drawing.image import Image as XLImage
-import os
 # 📷 Afficher un logo
 st.set_page_config(
     page_title="Gestion de la Facturation",
@@ -295,7 +283,37 @@ def _make_image_flowable(path, target_height):
     except Exception as e:
         print(f"⚠ Impossible de charger l'image {path}: {e}")
         return Spacer(1, target_height)
+# def calcul_jours_ouvres(row):
+#     # Ignorer si une des deux dates est NaN
+#     if pd.isna(row["Date départ congé"]) or pd.isna(row["Date de reprise"]):
+#         return 0
 
+#     # Conversion en datetime
+#     date_debut = pd.to_datetime(row["Date départ congé"], dayfirst=True, errors="coerce")
+#     date_fin = pd.to_datetime(row["Date de reprise"], dayfirst=True, errors="coerce")
+
+#     if pd.isna(date_debut) or pd.isna(date_fin):
+#         return 0
+
+#     # DEBUG: Afficher les dates
+#     print(f"Date début: {date_debut}, Date fin: {date_fin}")
+    
+#     # Générer les dates entre début et fin (exclure la date de reprise)
+#     toutes_les_dates = pd.date_range(start=date_debut, end=date_fin - pd.Timedelta(days=1), freq="D")
+    
+#     # DEBUG: Afficher toutes les dates générées
+#     print(f"Toutes les dates générées: {list(toutes_les_dates)}")
+#     print(f"Nombre total de dates: {len(toutes_les_dates)}")
+
+#     # Exclure vendredi (4) et samedi (5) -> week-end en Algérie
+#     jours_ouvres = toutes_les_dates[~toutes_les_dates.weekday.isin([4, 5])]
+    
+#     # DEBUG: Afficher les jours ouvrés
+#     print(f"Jours ouvrés: {list(jours_ouvres)}")
+#     print(f"Nombre jours ouvrés: {len(jours_ouvres)}")
+#     print("---")
+
+#     return len(jours_ouvres)
 
 
 def calcul_joursstc_ouvres(row):
@@ -317,10 +335,17 @@ def calcul_joursstc_ouvres(row):
     
     return jours_ouvres
 
+import pandas as pd
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+import os
+from openpyxl.drawing.image import Image as XLImage
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+from openpyxl.utils import get_column_letter
 
 def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_app/Logos"):
-    
-
     # 📌 Créer un nouveau classeur Excel
     wb = Workbook()
     ws = wb.active
@@ -400,7 +425,33 @@ def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_a
         if '_' in key:
             ligne_nom, mois_nom = key.rsplit('_', 1)
             mois_data.setdefault(mois_nom, {})[ligne_nom] = value
-    mois_disponibles = list(mois_data.keys()) or ["Août", "Septembre"]
+
+    def is_useful_value(v):
+        """Retourne True si la valeur est utile (non NaN, non vide)."""
+        if v is None:
+            return False
+        # float NaN
+        try:
+            if isinstance(v, float) and math.isnan(v):
+                return False
+        except Exception:
+            pass
+        # NaN-like
+        try:
+            if v != v:
+                return False
+        except Exception:
+            pass
+        # chaînes "vides"
+        if isinstance(v, str):
+            s = v.strip().lower()
+            if s == "" or s in ("nan", "none", "na", "<na>", "null"):
+                return False
+            return True
+        return True
+
+    # ✅ garder uniquement les mois qui ont AU MOINS une valeur utile
+    mois_disponibles = [m for m, lignes in mois_data.items() if any(is_useful_value(v) for v in lignes.values())]
 
     # 📌 Fonction pour générer un tableau
     def generer_tableau(start_row, titre, lignes):
@@ -525,17 +576,13 @@ def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_a
     # 📌 Largeur colonnes
     for col in range(COL_OFFSET, COL_OFFSET + len(mois_disponibles) + 2):
         ws.column_dimensions[get_column_letter(col)].width = 40
-    
+    ws.freeze_panes = "E1"
+
     # 📌 Sauvegarde
     if not nom_fichier.endswith('.xlsx'):
         nom_fichier += '.xlsx'
     wb.save(nom_fichier)
     return nom_fichier
-
-
-
-
-
 
 USERS_FILE = "users.json"
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -806,63 +853,108 @@ else:
                 colonnes_mois = [col for col in df_client.columns if any(mois in col.lower() for mois in mois_possibles)]
                 nb_employes = df_client["N°"].nunique()
                 st.success(f"{nb_employes} employés trouvés.")
-                from PIL import Image  
-                MAX_WIDTH = 800
-                uploaded_image = st.sidebar.file_uploader("📷 Charger la capture", type=["png", "jpg", "jpeg"])
+                source = st.sidebar.radio("📌 Source des taux :", ["Capture d'écran", "OANDA"])
+                if "df_rates" not in st.session_state:
+                    st.session_state.df_rates = pd.DataFrame(columns=["Devise", "Achat", "Vente"])
+                    devise_active = st.sidebar.radio("Choisir la devise :", ["EUR", "USD"], horizontal=True)
+                    st.session_state.devise_active = devise_active
+                if source == "Capture d'écran":
+                    from PIL import Image  
+                    MAX_WIDTH = 800
+                    uploaded_image = st.sidebar.file_uploader("📷 Charger la capture", type=["png", "jpg", "jpeg"])
 
-                if uploaded_image is not None:
-                    image = Image.open(uploaded_image)
+                    if uploaded_image is not None:
+                        image = Image.open(uploaded_image)
 
-                    # Redimensionner si trop large
-                    width, height = image.size
-                    if width > MAX_WIDTH:
-                        ratio = MAX_WIDTH / width
-                        new_size = (MAX_WIDTH, int(height * ratio))
-                        image = image.resize(new_size, Image.Resampling.LANCZOS)
+                        # Redimensionner si trop large
+                        width, height = image.size
+                        if width > MAX_WIDTH:
+                            ratio = MAX_WIDTH / width
+                            new_size = (MAX_WIDTH, int(height * ratio))
+                            image = image.resize(new_size, Image.Resampling.LANCZOS)
 
-                    st.sidebar.image(image, caption="Capture chargée", use_container_width=True)
+                        st.sidebar.image(image, caption="Capture chargée", use_container_width=True)
 
-                    # OCR avec EasyOCR
-                    reader = easyocr.Reader(['en', 'fr'])
-                    result = reader.readtext(np.array(image), detail=0)  # texte brut
-                    lines = [line.strip() for line in result if line.strip()]
+                        # OCR avec EasyOCR
+                        reader = easyocr.Reader(['en', 'fr'])
+                        result = reader.readtext(np.array(image), detail=0)  # texte brut
+                        lines = [line.strip() for line in result if line.strip()]
 
-                    # st.sidebar.text_area("📄 Texte brut OCR", value="\n".join(lines), height=200)
+                        # st.sidebar.text_area("📄 Texte brut OCR", value="\n".join(lines), height=200)
 
-                    # 🔎 Extraire les blocs Devise + Achat + Vente
-                    data = []
-                    i = 0
-                    while i < len(lines):
-                        line = lines[i]
+                        # 🔎 Extraire les blocs Devise + Achat + Vente
+                        data = []
+                        i = 0
+                        while i < len(lines):
+                            line = lines[i]
 
-                        # Devise = 3 lettres majuscules
-                        if re.match(r"^[A-Z]{3}$", line):
-                            devise = line
-                            try:
-                                achat = float(lines[i+1].replace(",", "."))
-                                vente = float(lines[i+2].replace(",", "."))
-                                data.append([devise, achat, vente])
-                                i += 3  # avancer de 3 lignes
-                                continue
-                            except Exception:
-                                pass
-                        i += 1
+                            # Devise = 3 lettres majuscules
+                            if re.match(r"^[A-Z]{3}$", line):
+                                devise = line
+                                try:
+                                    achat = float(lines[i+1].replace(",", "."))
+                                    vente = float(lines[i+2].replace(",", "."))
+                                    data.append([devise, achat, vente])
+                                    i += 3  # avancer de 3 lignes
+                                    continue
+                                except Exception:
+                                    pass
+                            i += 1
 
-                    if data:
-                        df_rates = pd.DataFrame(data, columns=["Devise", "Achat", "Vente"])
-                        st.write("📊 Taux extraits :")
-                        st.dataframe(df_rates)
+                        if data:
+                            df_rates = pd.DataFrame(data, columns=["Devise", "Achat", "Vente"])
+                            st.write("📊 Taux extraits :")
+                            st.dataframe(df_rates)
 
-                        # Sauvegarde en session_state
-                        st.session_state.df_rates = df_rates
+                            # Sauvegarde en session_state
+                            st.session_state.df_rates = df_rates
 
-                        # Interface choix devise
-                        devise_active = st.sidebar.radio("Choisir la devise :", ["EUR", "USD"], horizontal=True)
-                        st.session_state.devise_active = devise_active
+                            # Interface choix devise
+                            devise_active = st.sidebar.radio("Choisir la devise :", ["EUR", "USD"], horizontal=True)
+                            st.session_state.devise_active = devise_active
 
 
-                    else:
-                        st.warning("⚠️ Aucun taux détecté dans l'image")
+                        else:
+                            st.warning("⚠️ Aucun taux détecté dans l'image")
+                elif source == "OANDA":
+                    if "df_rates" not in st.session_state:
+                        st.session_state.df_rates = pd.DataFrame(
+                            [["EUR", 1.0, 1.0]],  # Valeur par défaut
+                            columns=["Devise", "Achat", "Vente"]
+                        )
+                    st.sidebar.markdown("## 💱 Saisie du taux de change (OANDA manuel)")
+                    with st.sidebar.form("oanda_manual_form"):
+                        base = st.text_input("Devise de base", "USD").upper().strip()
+                        target = st.text_input("Devise cible", "DZD").upper().strip()
+                        taux = st.number_input(
+                            f"Taux (1 {base} = ? {target})",
+                            min_value=0.0,
+                            format="%.6f"
+                        )
+                        submit = st.form_submit_button("Enregistrer")
+                    devise_active = st.sidebar.radio("Choisir la devise :", ["USD", "EUR"], horizontal=True)
+                    st.session_state.devise_active = devise_active
+                    if submit:
+                        if taux <= 0:
+                            st.error("Le taux doit être supérieur à 0.")
+                        else:
+                            pair = f"{base}"
+                            new_row = {"Devise": pair, "Achat": taux, "Vente": taux}
+
+                            df = st.session_state.df_rates.copy()
+                            mask = df["Devise"] == pair
+                            if mask.any():
+                                df.loc[mask, ["Achat", "Vente"]] = [taux, taux]
+                            else:
+                                df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+
+                            st.session_state.df_rates = df
+                            st.sidebar.success(f"Taux {pair} enregistré : {taux}")
+
+                # --- Affichage du tableau ---
+                # if not st.session_state.df_rates.empty:
+                #     st.markdown("### 📊 Taux enregistrés")
+                #     st.dataframe(st.session_state.df_rates.reset_index(drop=True))
                 col1, = st.columns(1) 
                 with col1:
                     jours_mois = st.number_input("Jours mois", min_value=28.0, max_value=31.0, step=1.0, value=30.0)
@@ -1147,7 +1239,16 @@ else:
                             df_rates = st.session_state.df_rates
 
                             # Récupérer les taux
-                            euro_rate = df_rates.loc[df_rates["Devise"] == "EUR", "Achat"].values[0]
+                            euro_row = st.session_state.df_rates.loc[
+                                st.session_state.df_rates["Devise"].str.contains("EUR"), "Achat"
+                            ]
+
+                            if not euro_row.empty:
+                                euro_rate = euro_row.values[0]
+                            else:
+                                st.sidebar.warning("⚠️ Aucun taux EUR trouvé dans df_rates")
+                                euro_rate = None
+
                             usd_rate  = df_rates.loc[df_rates["Devise"] == "USD", "Achat"].values[0]
 
                             # Choisir le bon taux en fonction de la sélection utilisateur
@@ -1164,7 +1265,16 @@ else:
                             df_rates = st.session_state.df_rates
 
                             # Récupérer les taux
-                            euro_rate = df_rates.loc[df_rates["Devise"] == "EUR", "Achat"].values[0]
+                            euro_row = st.session_state.df_rates.loc[
+                                st.session_state.df_rates["Devise"].str.contains("EUR"), "Achat"
+                            ]
+
+                            if not euro_row.empty:
+                                euro_rate = euro_row.values[0]
+                            else:
+                                st.sidebar.warning("⚠️ Aucun taux EUR trouvé dans df_rates")
+                                euro_rate = None
+
                             usd_rate  = df_rates.loc[df_rates["Devise"] == "USD", "Achat"].values[0]
 
                             # Choisir le bon taux en fonction de la sélection utilisateur
@@ -1205,7 +1315,16 @@ else:
                             df_rates = st.session_state.df_rates
 
                             # Récupérer les taux
-                            euro_rate = df_rates.loc[df_rates["Devise"] == "EUR", "Achat"].values[0]
+                            euro_row = st.session_state.df_rates.loc[
+                                st.session_state.df_rates["Devise"].str.contains("EUR"), "Achat"
+                            ]
+
+                            if not euro_row.empty:
+                                euro_rate = euro_row.values[0]
+                            else:
+                                st.sidebar.warning("⚠️ Aucun taux EUR trouvé dans df_rates")
+                                euro_rate = None
+
                             usd_rate  = df_rates.loc[df_rates["Devise"] == "USD", "Achat"].values[0]
 
                             # Choisir le bon taux en fonction de la sélection utilisateur
@@ -1221,7 +1340,16 @@ else:
                             df_rates = st.session_state.df_rates
 
                             # Récupérer les taux
-                            euro_rate = df_rates.loc[df_rates["Devise"] == "EUR", "Achat"].values[0]
+                            euro_row = st.session_state.df_rates.loc[
+                                st.session_state.df_rates["Devise"].str.contains("EUR"), "Achat"
+                            ]
+
+                            if not euro_row.empty:
+                                euro_rate = euro_row.values[0]
+                            else:
+                                st.sidebar.warning("⚠️ Aucun taux EUR trouvé dans df_rates")
+                                euro_rate = None
+
                             usd_rate  = df_rates.loc[df_rates["Devise"] == "USD", "Achat"].values[0]
 
                             # Choisir le bon taux en fonction de la sélection utilisateur
@@ -1261,7 +1389,16 @@ else:
                             df_rates = st.session_state.df_rates
 
                             # Récupérer les taux
-                            euro_rate = df_rates.loc[df_rates["Devise"] == "EUR", "Achat"].values[0]
+                            euro_row = st.session_state.df_rates.loc[
+                                st.session_state.df_rates["Devise"].str.contains("EUR"), "Achat"
+                            ]
+
+                            if not euro_row.empty:
+                                euro_rate = euro_row.values[0]
+                            else:
+                                st.sidebar.warning("⚠️ Aucun taux EUR trouvé dans df_rates")
+                                euro_rate = None
+
                             usd_rate  = df_rates.loc[df_rates["Devise"] == "USD", "Achat"].values[0]
 
                             # Choisir le bon taux en fonction de la sélection utilisateur
@@ -1277,7 +1414,16 @@ else:
                             df_rates = st.session_state.df_rates
 
                             # Récupérer les taux
-                            euro_rate = df_rates.loc[df_rates["Devise"] == "EUR", "Achat"].values[0]
+                            euro_row = st.session_state.df_rates.loc[
+                                st.session_state.df_rates["Devise"].str.contains("EUR"), "Achat"
+                            ]
+
+                            if not euro_row.empty:
+                                euro_rate = euro_row.values[0]
+                            else:
+                                st.sidebar.warning("⚠️ Aucun taux EUR trouvé dans df_rates")
+                                euro_rate = None
+
                             usd_rate  = df_rates.loc[df_rates["Devise"] == "USD", "Achat"].values[0]
 
                             # Choisir le bon taux en fonction de la sélection utilisateur
@@ -1299,7 +1445,16 @@ else:
                             df_rates = st.session_state.df_rates
 
                             # Récupérer les taux
-                            euro_rate = df_rates.loc[df_rates["Devise"] == "EUR", "Achat"].values[0]
+                            euro_row = st.session_state.df_rates.loc[
+                                st.session_state.df_rates["Devise"].str.contains("EUR"), "Achat"
+                            ]
+
+                            if not euro_row.empty:
+                                euro_rate = euro_row.values[0]
+                            else:
+                                st.sidebar.warning("⚠️ Aucun taux EUR trouvé dans df_rates")
+                                euro_rate = None
+
                             usd_rate  = df_rates.loc[df_rates["Devise"] == "USD", "Achat"].values[0]
 
                             # Choisir le bon taux en fonction de la sélection utilisateur
@@ -1316,7 +1471,16 @@ else:
                             df_rates = st.session_state.df_rates
 
                             # Récupérer les taux
-                            euro_rate = df_rates.loc[df_rates["Devise"] == "EUR", "Achat"].values[0]
+                            euro_row = st.session_state.df_rates.loc[
+                                st.session_state.df_rates["Devise"].str.contains("EUR"), "Achat"
+                            ]
+
+                            if not euro_row.empty:
+                                euro_rate = euro_row.values[0]
+                            else:
+                                st.sidebar.warning("⚠️ Aucun taux EUR trouvé dans df_rates")
+                                euro_rate = None
+
                             usd_rate  = df_rates.loc[df_rates["Devise"] == "USD", "Achat"].values[0]
 
                             # Choisir le bon taux en fonction de la sélection utilisateur
@@ -1356,7 +1520,16 @@ else:
                             df_rates = st.session_state.df_rates
 
                             # Récupérer les taux
-                            euro_rate = df_rates.loc[df_rates["Devise"] == "EUR", "Achat"].values[0]
+                            euro_row = st.session_state.df_rates.loc[
+                                st.session_state.df_rates["Devise"].str.contains("EUR"), "Achat"
+                            ]
+
+                            if not euro_row.empty:
+                                euro_rate = euro_row.values[0]
+                            else:
+                                st.sidebar.warning("⚠️ Aucun taux EUR trouvé dans df_rates")
+                                euro_rate = None
+
                             usd_rate  = df_rates.loc[df_rates["Devise"] == "USD", "Achat"].values[0]
 
                             # Choisir le bon taux en fonction de la sélection utilisateur
@@ -1373,7 +1546,16 @@ else:
                             df_rates = st.session_state.df_rates
 
                             # Récupérer les taux
-                            euro_rate = df_rates.loc[df_rates["Devise"] == "EUR", "Achat"].values[0]
+                            euro_row = st.session_state.df_rates.loc[
+                                st.session_state.df_rates["Devise"].str.contains("EUR"), "Achat"
+                            ]
+
+                            if not euro_row.empty:
+                                euro_rate = euro_row.values[0]
+                            else:
+                                st.sidebar.warning("⚠️ Aucun taux EUR trouvé dans df_rates")
+                                euro_rate = None
+
                             usd_rate  = df_rates.loc[df_rates["Devise"] == "USD", "Achat"].values[0]
 
                             # Choisir le bon taux en fonction de la sélection utilisateur
