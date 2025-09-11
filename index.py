@@ -972,7 +972,7 @@ else:
                     "Heures supp 100% (H)", "Heures supp 75% (H)", "Heures supp 50% (H)", "Jours supp (Jour)","Taux complément santé (DZD)","Frais téléphone",
                     "Frais de transport (Yassir)","Frais divers","Avance NET (DZD)","Augmentation", "Régul", "Coût congé payé", "Nbr jours STC (jours)",
                     "Jours de congé (22 jours)","Indemnité non cotisable et imposable 10% (DZD)","Indemnité zone", "Total absence (sur 22 jours)",
-                    "Nouvelle indémnité Véhicule (DZD)","Nouveau IFSP (20% du salaire de base)","Nbr jours augmentation"
+                    "Nouvelle indémnité Véhicule (DZD)","Nouveau IFSP (20% du salaire de base)","Nbr jours augmentation","Indemnité de départ (Net)"
                 ]
                 for col in cols_to_float:
                     if col in df_client.columns:
@@ -1675,4 +1675,5 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
