@@ -1124,7 +1124,7 @@ else:
                 df_client["Retenue CNAS employé"] = df_client["Base cotisable"] * 0.09
                 if df_client["Etablissement"].iloc[0] == "Henkel": 
                     
-                    df_client["Base imposable au baréme"]  = ((((df_client["Salaire de base calcule"]+ df_client["Prime mensuelle calcule"])-((df_client["Salaire de base calcule"]+ df_client["Prime mensuelle calcule"])*0.09))+df_client["Indemnité 22jours"])/10)*10
+                    df_client["Base imposable au baréme"]  = ((((df_client["Salaire de base calcule"]+ df_client["Prime mensuelle (Barème) (DZD)"])-((df_client["Salaire de base calcule"]+ df_client["Prime mensuelle (Barème) (DZD)"])*0.09))+df_client["Indemnité 22jours"])/10)*10
                 elif   df_client["Etablissement"].iloc[0] == "LG":
                         df_client["Base imposable au baréme"] = np.floor(((((df_client["Salaire de base calcule"] +df_client["Prime exeptionnelle (10%) (DZD)"] ) * 0.91)+ df_client["Indemnité 22jours"]))/ 10) * 10
                 elif df_client["Etablissement"].iloc[0] == "G+D":
@@ -1675,5 +1675,6 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
