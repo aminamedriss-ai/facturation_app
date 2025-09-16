@@ -9,4 +9,5 @@ supabase
 openpyxl
 pytesseract
 easyocr
-
+googleapiclient
+google_auth_oauthlib
