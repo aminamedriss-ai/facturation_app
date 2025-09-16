@@ -320,15 +320,12 @@ from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 from openpyxl.utils import get_column_letter
 from google.oauth2 import service_account
 
-SCOPES = ["https://www.googleapis.com/auth/drive"]
-
 def authenticate_drive():
     creds = service_account.Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"].to_dict(),  # 🔑 nécessite bien [gcp_service_account] dans secrets.toml
-        scopes=SCOPES
+        st.secrets["gcp_service_account"],
+        scopes=["https://www.googleapis.com/auth/drive"]
     )
-    service = build("drive", "v3", credentials=creds)
-    return service
+    return build("drive", "v3", credentials=creds)
 
 
 def get_or_create_folder(service, folder_name, parent_id=None):
@@ -1732,6 +1729,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
