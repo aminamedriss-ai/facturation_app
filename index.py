@@ -320,7 +320,7 @@ from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 from openpyxl.utils import get_column_letter
 from google.oauth2 import service_account
 
-SCOPES = ['https://www.googleapis.com/auth/drive.file']
+SCOPES = ["https://www.googleapis.com/auth/drive"]
 # st.write(type(st.secrets["gcp_service_account"])) 
 # st.json(st.secrets["gcp_service_account"])
 def authenticate_drive():
@@ -1735,6 +1735,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
