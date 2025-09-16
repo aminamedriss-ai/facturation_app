@@ -389,9 +389,25 @@ def upload_to_drive(file_path, client_name, root_folder_id=None):
 
     # 3️⃣ Supprimer les doublons avant upload
     if existing_files:
-        for f in existing_files:
-            print(f"🗑 Suppression du fichier existant : {f['name']} ({f['id']})")
-            service.files().delete(fileId=f["id"]).execute()
+        file_id = existing_files[0]["id"]
+        print(f"♻️ Mise à jour du fichier existant : {file_name} ({file_id})")
+        
+        media = MediaFileUpload(
+            file_path,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        file = service.files().update(
+            fileId=file_id,
+            media_body=media
+        ).execute()
+    else:
+        file_metadata = {"name": file_name, "parents": [folder_id]}
+        media = MediaFileUpload(
+            file_path,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        file = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
+
 
     # 4️⃣ Upload du fichier
     file_metadata = {"name": file_name, "parents": [folder_id]}
@@ -1740,6 +1756,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
