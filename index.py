@@ -1749,7 +1749,7 @@ else:
                     )
 
                     # 3) Upload vers Drive
-                    drive_file_id = upload_to_drive(fichier_excel, client_name=row["Etablissement"] if pd.notna(row["Etablissement"]) else "Inconnu", root_folder_id="1vhxSZ3jtWEqLocQ7yx9AcsSCiVowbFve")
+                    drive_file_id = upload_to_drive(fichier_excel, client_name=row["Etablissement"] if pd.notna(row["Etablissement"]) else "Inconnu", root_folder_id="0AM1AktJToIM1Uk9PVA")
                     print("📂 Fichier envoyé sur Drive :", drive_file_id)
 
                     # 4) Supprimer la copie locale si tu veux
@@ -1763,6 +1763,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
