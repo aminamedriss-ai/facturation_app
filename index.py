@@ -322,26 +322,12 @@ SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
 def authenticate_drive():
     """
-    Authentifie l’utilisateur avec OAuth2 et retourne un service Google Drive.
+    Authentifie avec un compte de service et retourne un service Google Drive.
     """
-    creds = None
-
-    # 1️⃣ Charger le token existant (si dispo)
-    if os.path.exists("token.pickle"):
-        with open("token.pickle", "rb") as token:
-            creds = pickle.load(token)
-
-    # 2️⃣ Rafraîchir ou lancer le flux OAuth si besoin
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
-            creds = flow.run_local_server(port=0)
-
-        # Sauvegarde du token pour les prochaines utilisations
-        with open("token.pickle", "wb") as token:
-            pickle.dump(creds, token)
+    creds = service_account.Credentials.from_service_account_file(
+        "service_account.json",  # <-- le fichier JSON du compte service
+        scopes=SCOPES
+    )
 
     return build("drive", "v3", credentials=creds)
 
@@ -1747,6 +1733,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
