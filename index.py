@@ -322,13 +322,12 @@ SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
 def authenticate_drive():
     """
-    Authentifie avec un compte de service et retourne un service Google Drive.
+    Authentifie avec un compte de service (via secrets Streamlit) et retourne un service Google Drive.
     """
-    creds = service_account.Credentials.from_service_account_file(
-        "service_account.json",  # <-- le fichier JSON du compte service
+    creds = service_account.Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"],  # 👈 lit depuis secrets.toml
         scopes=SCOPES
     )
-
     return build("drive", "v3", credentials=creds)
 
 
@@ -1733,6 +1732,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
