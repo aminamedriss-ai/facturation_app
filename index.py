@@ -368,11 +368,15 @@ def get_or_create_folder(service, folder_name, parent_id=None):
     return folder["id"]
 
 
+from googleapiclient.errors import HttpError
+from googleapiclient.http import MediaFileUpload
+import os
+
 def upload_to_drive(file_path, client_name, root_folder_id=None):
     """
     Upload un fichier Excel dans le dossier du client sur Google Drive.
     - Crée le dossier du client si nécessaire
-    - Supprime le fichier existant avant de recharger le nouveau
+    - Met à jour le fichier existant ou le crée si absent
     Retourne l'ID du fichier uploadé.
     """
     service = authenticate_drive()
@@ -388,39 +392,35 @@ def upload_to_drive(file_path, client_name, root_folder_id=None):
     results = service.files().list(q=query, fields="files(id, name)").execute()
     existing_files = results.get("files", [])
 
-    # 3️⃣ Supprimer les doublons avant upload
-    if existing_files:
-        file_id = existing_files[0]["id"]
-        print(f"♻️ Mise à jour du fichier existant : {file_name} ({file_id})")
-        
-        media = MediaFileUpload(
-            file_path,
-            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        try:
-            file = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
-        except HttpError as e:
-            print("⚠️ Erreur API Google :", e.content)  # affiche la réponse JSON complète
-            raise
-    else:
-        file_metadata = {"name": file_name, "parents": [folder_id]}
-        media = MediaFileUpload(
-            file_path,
-            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        file = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
-
-
-    # 4️⃣ Upload du fichier
-    file_metadata = {"name": file_name, "parents": [folder_id]}
     media = MediaFileUpload(
         file_path,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-    file = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-    print(f"✅ Nouveau fichier uploadé dans {client_name} : {file_name} ({file['id']})")
-    return file["id"]
+    try:
+        if existing_files:
+            # 🔄 Mise à jour du fichier existant
+            file_id = existing_files[0]["id"]
+            print(f"♻️ Mise à jour du fichier existant : {file_name} ({file_id})")
+            file = service.files().update(
+                fileId=file_id,
+                media_body=media
+            ).execute()
+        else:
+            # ➕ Création d’un nouveau fichier
+            file_metadata = {"name": file_name, "parents": [folder_id]}
+            file = service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields="id"
+            ).execute()
+
+        print(f"✅ Fichier uploadé dans {client_name} : {file_name} ({file['id']})")
+        return file["id"]
+
+    except HttpError as e:
+        print("⚠️ Erreur API Google :", e.content.decode("utf-8"))
+        raise
 
 
 def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_app/Logos"):
@@ -1758,6 +1758,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
