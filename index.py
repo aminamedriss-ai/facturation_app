@@ -365,17 +365,22 @@ def authenticate_drive():
 
 
 
-def get_or_create_folder(service, folder_name, parent_id=None):
+def get_or_create_folder(service, folder_name, parent_id=None, drive_id=None):
     """
-    Vérifie si un dossier existe dans Google Drive, sinon le crée.
+    Vérifie si un dossier existe dans Google Drive (y compris Drive partagé), sinon le crée.
     Retourne l'ID du dossier.
     """
     # Requête pour chercher le dossier
-    query = f"mimeType='application/vnd.google-apps.folder' and name='{folder_name}' and trashed = false"
+    query = f"mimeType='application/vnd.google-apps.folder' and name='{folder_name}' and trashed=false"
     if parent_id:
         query += f" and '{parent_id}' in parents"
 
-    results = service.files().list(q=query, fields="files(id, name)").execute()
+    results = service.files().list(
+        q=query,
+        fields="files(id, name)",
+        includeItemsFromAllDrives=True,
+        supportsAllDrives=True
+    ).execute()
     items = results.get("files", [])
 
     if items:
@@ -388,8 +393,14 @@ def get_or_create_folder(service, folder_name, parent_id=None):
     }
     if parent_id:
         metadata["parents"] = [parent_id]
+    if drive_id:  # obligatoire pour Drive partagé si parent_id est la racine
+        metadata["driveId"] = drive_id
 
-    folder = service.files().create(body=metadata, fields="id").execute()
+    folder = service.files().create(
+        body=metadata,
+        fields="id",
+        supportsAllDrives=True
+    ).execute()
     return folder["id"]
 
 
@@ -397,35 +408,49 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 import os
 
-def upload_to_drive(file_path, client_name, root_folder_id):
+def upload_to_drive(file_path, client_name, root_folder_id=None, drive_id=None):
     service = authenticate_drive()
 
-    # 1️⃣ Vérifier/créer le dossier du client dans ton dossier partagé
-    folder_id = get_or_create_folder(service, client_name, parent_id=root_folder_id)
+    # 1️⃣ Vérifier/créer le dossier client
+    folder_id = get_or_create_folder(service, client_name, parent_id=root_folder_id, drive_id=drive_id)
 
-    # 2️⃣ Nom du fichier
+    # Nom du fichier (nom local)
     file_name = os.path.basename(file_path)
 
-    # 3️⃣ Vérifier si le fichier existe déjà
+    # 2️⃣ Vérifier si un fichier avec le même nom existe déjà
     query = f"name='{file_name}' and '{folder_id}' in parents and trashed=false"
-    results = service.files().list(q=query, fields="files(id, name)").execute()
+    results = service.files().list(
+        q=query,
+        fields="files(id, name)",
+        includeItemsFromAllDrives=True,
+        supportsAllDrives=True
+    ).execute()
     existing_files = results.get("files", [])
 
     if existing_files:
-        # Supprimer l’ancien avant upload
         file_id = existing_files[0]["id"]
-        service.files().delete(fileId=file_id).execute()
-        print(f"♻️ Ancien fichier supprimé : {file_name}")
+        print(f"♻️ Mise à jour du fichier existant : {file_name} ({file_id})")
 
-    # 4️⃣ Upload du nouveau fichier
-    file_metadata = {"name": file_name, "parents": [folder_id]}
-    media = MediaFileUpload(
-        file_path,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-    file = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
+        media = MediaFileUpload(file_path, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        file = service.files().update(
+            fileId=file_id,
+            media_body=media,
+            supportsAllDrives=True
+        ).execute()
+    else:
+        file_metadata = {"name": file_name, "parents": [folder_id]}
+        if drive_id:  # utile si on est dans un Drive partagé
+            file_metadata["driveId"] = drive_id
 
-    print(f"✅ Fichier uploadé dans {client_name} : {file_name} ({file['id']})")
+        media = MediaFileUpload(file_path, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        file = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields="id",
+            supportsAllDrives=True
+        ).execute()
+
+    print(f"✅ Fichier disponible dans {client_name} : {file_name} ({file['id']})")
     return file["id"]
 
 def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_app/Logos"):
@@ -1749,8 +1774,13 @@ else:
                     )
 
                     # 3) Upload vers Drive
-                    drive_file_id = upload_to_drive(fichier_excel, client_name=row["Etablissement"] if pd.notna(row["Etablissement"]) else "Inconnu", root_folder_id="0AM1AktJToIM1Uk9PVA")
-                    print("📂 Fichier envoyé sur Drive :", drive_file_id)
+                    drive_file_id = upload_to_drive(
+                            fichier_excel,
+                            client_name=row["Etablissement"] if pd.notna(row["Etablissement"]) else "Inconnu",
+                            root_folder_id="0AM1AktJToIM1Uk9PVA",  # ton Drive partagé
+                            drive_id="0AM1AktJToIM1Uk9PVA"         # driveId obligatoire
+                        )
+
 
                     # 4) Supprimer la copie locale si tu veux
                     import os
@@ -1763,6 +1793,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
