@@ -400,10 +400,17 @@ def upload_to_drive(file_path, client_name, root_folder_id=None):
         # ✅ Mise à jour
         file_id = existing_files[0]["id"]
         print(f"♻️ Mise à jour du fichier existant : {file_name} ({file_id})")
-        file = service.files().update(
-            fileId=file_id,
-            media_body=media
-        ).execute()
+        try:
+            file = service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields="id"
+            ).execute()
+        except HttpError as e:
+            print("⚠️ HttpError :", e)
+            print("Status Code:", e.resp.status if hasattr(e, "resp") else "N/A")
+            print("Content:", e.content.decode() if hasattr(e, "content") else e.content)
+            raise
     else:
         # ✅ Nouveau fichier
         file_metadata = {"name": file_name, "parents": [folder_id]}
@@ -1752,6 +1759,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
