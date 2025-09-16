@@ -325,7 +325,18 @@ def authenticate_drive():
         st.secrets["gcp_service_account"],
         scopes=["https://www.googleapis.com/auth/drive"]
     )
-    return build("drive", "v3", credentials=creds)
+    service = build("drive", "v3", credentials=creds)
+
+    try:
+        # Test: lister quelques fichiers accessibles
+        results = service.files().list(pageSize=5, fields="files(id, name)").execute()
+        st.success("✅ Connexion Drive réussie")
+        st.write(results.get("files", []))
+    except Exception as e:
+        st.error(f"❌ Erreur connexion Drive: {e}")
+
+    return service
+
 
 
 def get_or_create_folder(service, folder_name, parent_id=None):
@@ -1729,6 +1740,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
