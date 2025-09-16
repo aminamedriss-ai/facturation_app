@@ -321,17 +321,14 @@ from openpyxl.utils import get_column_letter
 from google.oauth2 import service_account
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
-# st.write(type(st.secrets["gcp_service_account"])) 
-# st.json(st.secrets["gcp_service_account"])
+
 def authenticate_drive():
-    """
-    Authentifie avec un compte de service et retourne un service Google Drive.
-    """
     creds = service_account.Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"].to_dict(),  # 🔑 conversion ici
+        st.secrets["gcp_service_account"].to_dict(),  # 🔑 nécessite bien [gcp_service_account] dans secrets.toml
         scopes=SCOPES
     )
-    return build("drive", "v3", credentials=creds)
+    service = build("drive", "v3", credentials=creds)
+    return service
 
 
 def get_or_create_folder(service, folder_name, parent_id=None):
@@ -1735,6 +1732,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
