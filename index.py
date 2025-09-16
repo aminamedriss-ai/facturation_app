@@ -1666,15 +1666,18 @@ else:
                             # Choisir le bon taux en fonction de la sélection utilisateur
                             rate = euro_rate if st.session_state.devise_active == "EUR" else usd_rate
                             df_client["Facture HT en devise"] = df_client["Facture HT + NDF"] / rate
-                df_client["Frais remboursement"] = df_client["Frais remboursement calcule"]
-                df_client["Salaire de base"] = df_client["Salaire de base calcule"]
-                df_client["Indemnité de panier"] = df_client["Indemnité de panier calcule"]
-                df_client["Indemnité de transport"] = df_client["Indemnité de transport calcule"]
-                tva_multiplicateur = 1+ (df_client["TVA"]/100)
-                # Calcul TVA et TTC
-                df_client["Facture TVA"] = df_client["Facture HT + NDF"] * (df_client["TVA"] / 100)
-                df_client["Facture TTC"] = df_client["Facture HT + NDF"] + df_client["Facture TVA"]
-                df_client["Observation"] = Observation
+               new_cols = pd.DataFrame({
+                    "Frais remboursement": df_client["Frais remboursement calcule"],
+                    "Salaire de base": df_client["Salaire de base calcule"],
+                    "Indemnité de panier": df_client["Indemnité de panier calcule"],
+                    "Indemnité de transport": df_client["Indemnité de transport calcule"],
+                    "Facture TVA": df_client["Facture HT + NDF"] * (df_client["TVA"] / 100),
+                    "Facture TTC": df_client["Facture HT + NDF"] * (1 + df_client["TVA"] / 100),
+                    "Observation": Observation
+                })
+
+                # Fusionner en une seule fois
+                df_client = pd.concat([df_client, new_cols], axis=1).copy()
                 # st.write("Mois distincts trouvés :", df_client["Mois"].unique())
 
                 st.write(df_client.head(50)) # On peut encapsuler ton code de calculs dans une fonction
@@ -1772,6 +1775,9 @@ else:
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key=f"excel_{matricule}_{idx}"
                     )
+                    import os
+                    print("📂 Fichier généré :", fichier_excel)
+                    print("Existe localement ?", os.path.exists(fichier_excel))
 
                     # 3) Upload vers Drive
                     drive_file_id = upload_to_drive(
@@ -1793,6 +1799,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
