@@ -320,32 +320,32 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 from openpyxl.utils import get_column_letter
 from google.oauth2 import service_account
-SCOPES = ["https://www.googleapis.com/auth/drive"]
-FOLDER_ID = "1vhxSZ3jtWEqLocQ7yx9AcsSCiVowbFve"  # ton dossier partagé
+# SCOPES = ["https://www.googleapis.com/auth/drive"]
+# FOLDER_ID = "1vhxSZ3jtWEqLocQ7yx9AcsSCiVowbFve"  # ton dossier partagé
 
-def test_service_account_access():
-    # Authentification avec st.secrets
-    creds = service_account.Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"], scopes=SCOPES
-    )
-    service = build("drive", "v3", credentials=creds)
+# def test_service_account_access():
+#     # Authentification avec st.secrets
+#     creds = service_account.Credentials.from_service_account_info(
+#         st.secrets["gcp_service_account"], scopes=SCOPES
+#     )
+#     service = build("drive", "v3", credentials=creds)
 
-    try:
-        # Vérifier accès au dossier
-        folder = service.files().get(
-            fileId=FOLDER_ID,
-            fields="id, name, mimeType, owners"
-        ).execute()
+#     try:
+#         # Vérifier accès au dossier
+#         folder = service.files().get(
+#             fileId=FOLDER_ID,
+#             fields="id, name, mimeType, owners"
+#         ).execute()
 
-        st.success(f"✅ Accès OK au dossier : {folder['name']} (ID: {folder['id']})")
-        st.write(f"Propriétaire : {folder['owners'][0]['emailAddress']}")
+#         st.success(f"✅ Accès OK au dossier : {folder['name']} (ID: {folder['id']})")
+#         st.write(f"Propriétaire : {folder['owners'][0]['emailAddress']}")
 
-    except Exception as e:
-        st.error("❌ Accès refusé :")
-        st.exception(e)
+#     except Exception as e:
+#         st.error("❌ Accès refusé :")
+#         st.exception(e)
 
-# Exécution
-test_service_account_access()
+# # Exécution
+# test_service_account_access()
 def authenticate_drive():
     creds = service_account.Credentials.from_service_account_info(
         st.secrets["gcp_service_account"],
@@ -397,57 +397,36 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 import os
 
-def upload_to_drive(file_path, client_name, root_folder_id=None):
-    """
-    Upload un fichier Excel dans le dossier du client sur Google Drive.
-    - Crée le dossier du client si nécessaire
-    - Si le fichier existe déjà -> update
-    Retourne l'ID du fichier uploadé.
-    """
+def upload_to_drive(file_path, client_name, root_folder_id):
     service = authenticate_drive()
 
-    # 1️⃣ Vérifier/créer le dossier client
+    # 1️⃣ Vérifier/créer le dossier du client dans ton dossier partagé
     folder_id = get_or_create_folder(service, client_name, parent_id=root_folder_id)
 
+    # 2️⃣ Nom du fichier
     file_name = os.path.basename(file_path)
 
-    # 2️⃣ Vérifier si un fichier existe déjà
+    # 3️⃣ Vérifier si le fichier existe déjà
     query = f"name='{file_name}' and '{folder_id}' in parents and trashed=false"
     results = service.files().list(q=query, fields="files(id, name)").execute()
     existing_files = results.get("files", [])
 
+    if existing_files:
+        # Supprimer l’ancien avant upload
+        file_id = existing_files[0]["id"]
+        service.files().delete(fileId=file_id).execute()
+        print(f"♻️ Ancien fichier supprimé : {file_name}")
+
+    # 4️⃣ Upload du nouveau fichier
+    file_metadata = {"name": file_name, "parents": [folder_id]}
     media = MediaFileUpload(
         file_path,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+    file = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-    if existing_files:
-        # ✅ Mise à jour
-        file_id = existing_files[0]["id"]
-        print(f"♻️ Mise à jour du fichier existant : {file_name} ({file_id})")
-        try:
-            file = service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields="id"
-            ).execute()
-        except HttpError as e:
-            print("⚠️ HttpError :", e)
-            print("Status Code:", e.resp.status if hasattr(e, "resp") else "N/A")
-            print("Content:", e.content.decode() if hasattr(e, "content") else e.content)
-            raise
-    else:
-        # ✅ Nouveau fichier
-        file_metadata = {"name": file_name, "parents": [folder_id]}
-        file = service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields="id"
-        ).execute()
-
-    print(f"✅ Upload terminé : {file_name} ({file['id']})")
+    print(f"✅ Fichier uploadé dans {client_name} : {file_name} ({file['id']})")
     return file["id"]
-
 
 def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_app/Logos"):
 
@@ -1784,6 +1763,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
