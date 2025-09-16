@@ -1696,26 +1696,52 @@ else:
                 val_cols = [c for c in df_client.columns if c not in id_cols + ["Mois"]]
 
                 # Pivot
-                df_pivot = df_client.pivot_table(
+                nb_candidats = df_client["N°"].nunique()
+
+                if df_client["N°"].nunique() == 1:
+                    # Un seul candidat → regrouper toutes les lignes par mois
+                    employe_data = {}
+                    for _, row in df_client.iterrows():
+                        mois = row["Mois"]
+                        for col in df_client.columns:
+                            if col not in id_cols + ["Mois"]:
+                                employe_data[f"{col}_{mois}"] = row[col]
+
+                    # Réordonner les colonnes par mois_ordre
+                    ordered_employe_data = {}
+                    # Ajouter d'abord les colonnes statiques
+                    for col in id_cols:
+                        ordered_employe_data[col] = df_client.iloc[0][col]
+
+                    # Ajouter les colonnes par mois
+                    for mois in mois_ordre:
+                        for col in val_cols:  # toutes les colonnes variables
+                            key = f"{col}_{mois}"
+                            if key in employe_data:
+                                ordered_employe_data[key] = employe_data[key]
+
+                    employe_data = ordered_employe_data
+
+                else:
+                    # Plusieurs candidats → pivot classique
+                    df_pivot = df_client.pivot_table(
                     index=id_cols,
                     columns="Mois",
                     values=val_cols,
-                    aggfunc="first"   # tu peux mettre "max" ou "sum" selon ton besoin
+                    aggfunc="first"
                 )
 
-                # Aplatir
-                df_pivot.columns = [f"{val}_{mois}" for val, mois in df_pivot.columns]
-                df_pivot = df_pivot.reset_index()
+                    # Aplatir le MultiIndex
+                    df_pivot.columns = [f"{val}_{mois}" for val, mois in df_pivot.columns]
+                    df_pivot = df_pivot.reset_index()
 
-                # Réordonner
-                colonnes_identite = id_cols
-                colonnes_mois = []
+                    # Réordonner les colonnes par mois_ordre
+                    colonnes_identite = id_cols
+                    colonnes_mois = []
+                    for mois in mois_ordre:
+                        colonnes_mois.extend([c for c in df_pivot.columns if c.endswith(f"_{mois}")])
 
-                for mois in mois_ordre:
-                    colonnes_mois.extend([c for c in df_pivot.columns if c.endswith(f"_{mois}")])
-
-                # ✅ Réappliquer l’ordre
-                df_pivot = df_pivot[colonnes_identite + colonnes_mois]
+                    df_pivot = df_pivot[colonnes_identite + colonnes_mois]
          
 
 
@@ -1754,17 +1780,15 @@ else:
                 # 📥 Génération et téléchargement PDF par employé
                 # ------------------------------------------------
                 st.markdown("### 📥 Télécharger la facture PDF par employé")
-                for idx, row in df_pivot.iterrows():
-                    nom = str(row.get("Nom", f"employe_{idx}")).strip().replace(" ", "_")
-                    matricule = str(row.get("Matricule", f"id_{idx}")).strip()
+                if nb_candidats == 1:
+                    # Un seul candidat → on a déjà consolidé toutes les lignes dans employe_data
+                    nom = employe_data.get("Nom", "employe").replace(" ", "_")
+                    matricule = str(employe_data.get("N°", "id"))
 
-                    employe_data = row.to_dict()
-
-                    # Générer UN SEUL fichier consolidé avec tous les mois
-                    # 1) Générer le fichier Excel en local
+                    # Générer le fichier Excel
                     fichier_excel = generer_facture_excel(employe_data, f"{matricule}_{nom}_facture.xlsx")
 
-                    # 2) Lecture pour Streamlit
+                    # Lecture pour Streamlit
                     with open(fichier_excel, "rb") as f:
                         excel_data = f.read()
 
@@ -1773,24 +1797,47 @@ else:
                         data=excel_data,
                         file_name=f"{nom}_facture.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key=f"excel_{matricule}_{idx}"
+                        key=f"excel_{matricule}"
                     )
-                    import os
-                    print("📂 Fichier généré :", fichier_excel)
-                    print("Existe localement ?", os.path.exists(fichier_excel))
 
-                    # 3) Upload vers Drive
+                    # Upload Drive
                     drive_file_id = upload_to_drive(
-                            fichier_excel,
-                            client_name=row["Etablissement"] if pd.notna(row["Etablissement"]) else "Inconnu",
-                            root_folder_id="0AM1AktJToIM1Uk9PVA",  # ton Drive partagé
-                            drive_id="0AM1AktJToIM1Uk9PVA"         # driveId obligatoire
+                        fichier_excel,
+                        client_name=employe_data.get("Etablissement", "Inconnu"),
+                        root_folder_id="1vhxSZ3jtWEqLocQ7yx9AcsSCiVowbFve"
+                    )
+                    print("📂 Fichier envoyé sur Drive :", drive_file_id)
+
+                    # Supprimer local
+                    os.remove(fichier_excel)
+
+                else:
+                    # Plusieurs candidats → df_pivot existe
+                    for idx, row in df_pivot.iterrows():
+                        nom = str(row.get("Nom", f"employe_{idx}")).strip().replace(" ", "_")
+                        matricule = str(row.get("N°", f"id_{idx}")).strip()
+
+                        employe_data = row.to_dict()
+
+                        fichier_excel = generer_facture_excel(employe_data, f"{matricule}_{nom}_facture.xlsx")
+
+                        with open(fichier_excel, "rb") as f:
+                            excel_data = f.read()
+
+                        st.download_button(
+                            label=f"📊 {nom}",
+                            data=excel_data,
+                            file_name=f"{nom}_facture.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key=f"excel_{matricule}_{idx}"
                         )
 
+                        drive_file_id = upload_to_drive(
+                            fichier_excel,
+                            client_name=row.get("Etablissement", "Inconnu"),
+                            root_folder_id="1vhxSZ3jtWEqLocQ7yx9AcsSCiVowbFve"
+                        )
 
-                    # 4) Supprimer la copie locale si tu veux
-                    import os
-                    if os.path.exists(fichier_excel):
                         os.remove(fichier_excel)
 
 
@@ -1799,6 +1846,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
