@@ -320,7 +320,32 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 from openpyxl.utils import get_column_letter
 from google.oauth2 import service_account
+SCOPES = ["https://www.googleapis.com/auth/drive"]
+FOLDER_ID = "1vhxSZ3jtWEqLocQ7yx9AcsSCiVowbFve"  # ton dossier partagé
 
+def test_service_account_access():
+    # Authentification avec st.secrets
+    creds = service_account.Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"], scopes=SCOPES
+    )
+    service = build("drive", "v3", credentials=creds)
+
+    try:
+        # Vérifier accès au dossier
+        folder = service.files().get(
+            fileId=FOLDER_ID,
+            fields="id, name, mimeType, owners"
+        ).execute()
+
+        st.success(f"✅ Accès OK au dossier : {folder['name']} (ID: {folder['id']})")
+        st.write(f"Propriétaire : {folder['owners'][0]['emailAddress']}")
+
+    except Exception as e:
+        st.error("❌ Accès refusé :")
+        st.exception(e)
+
+# Exécution
+test_service_account_access()
 def authenticate_drive():
     creds = service_account.Credentials.from_service_account_info(
         st.secrets["gcp_service_account"],
@@ -1759,6 +1784,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
