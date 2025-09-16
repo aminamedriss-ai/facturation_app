@@ -397,10 +397,11 @@ def upload_to_drive(file_path, client_name, root_folder_id=None):
             file_path,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-        file = service.files().update(
-            fileId=file_id,
-            media_body=media
-        ).execute()
+        try:
+            file = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
+        except HttpError as e:
+            print("⚠️ Erreur API Google :", e.content)  # affiche la réponse JSON complète
+            raise
     else:
         file_metadata = {"name": file_name, "parents": [folder_id]}
         media = MediaFileUpload(
@@ -1757,6 +1758,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
