@@ -319,17 +319,16 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 from openpyxl.utils import get_column_letter
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
-st.write(type(st.secrets["gcp_service_account"])) 
-st.json(st.secrets["gcp_service_account"])
+# st.write(type(st.secrets["gcp_service_account"])) 
+# st.json(st.secrets["gcp_service_account"])
 def authenticate_drive():
     """
-    Authentifie avec un compte de service (via secrets Streamlit) et retourne un service Google Drive.
+    Authentifie avec un compte de service et retourne un service Google Drive.
     """
     creds = service_account.Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"],  # 👈 lit depuis secrets.toml
+        st.secrets["gcp_service_account"].to_dict(),  # 🔑 conversion ici
         scopes=SCOPES
     )
-    
     return build("drive", "v3", credentials=creds)
 
 
@@ -1734,6 +1733,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
