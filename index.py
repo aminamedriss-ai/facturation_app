@@ -376,7 +376,7 @@ def upload_to_drive(file_path, client_name, root_folder_id=None):
     """
     Upload un fichier Excel dans le dossier du client sur Google Drive.
     - Crée le dossier du client si nécessaire
-    - Met à jour le fichier existant ou le crée si absent
+    - Si le fichier existe déjà -> update
     Retourne l'ID du fichier uploadé.
     """
     service = authenticate_drive()
@@ -384,10 +384,9 @@ def upload_to_drive(file_path, client_name, root_folder_id=None):
     # 1️⃣ Vérifier/créer le dossier client
     folder_id = get_or_create_folder(service, client_name, parent_id=root_folder_id)
 
-    # Nom du fichier (nom local)
     file_name = os.path.basename(file_path)
 
-    # 2️⃣ Vérifier si un fichier avec le même nom existe déjà
+    # 2️⃣ Vérifier si un fichier existe déjà
     query = f"name='{file_name}' and '{folder_id}' in parents and trashed=false"
     results = service.files().list(q=query, fields="files(id, name)").execute()
     existing_files = results.get("files", [])
@@ -397,39 +396,34 @@ def upload_to_drive(file_path, client_name, root_folder_id=None):
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    try:
-        if existing_files:
-            # 🔄 Mise à jour du fichier existant
-            file_id = existing_files[0]["id"]
-            print(f"♻️ Mise à jour du fichier existant : {file_name} ({file_id})")
-            file = service.files().update(
-                fileId=file_id,
-                media_body=media
-            ).execute()
-        else:
-            # ➕ Création d’un nouveau fichier
-            file_metadata = {"name": file_name, "parents": [folder_id]}
-            file = service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields="id"
-            ).execute()
+    if existing_files:
+        # ✅ Mise à jour
+        file_id = existing_files[0]["id"]
+        print(f"♻️ Mise à jour du fichier existant : {file_name} ({file_id})")
+        file = service.files().update(
+            fileId=file_id,
+            media_body=media
+        ).execute()
+    else:
+        # ✅ Nouveau fichier
+        file_metadata = {"name": file_name, "parents": [folder_id]}
+        file = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields="id"
+        ).execute()
 
-        print(f"✅ Fichier uploadé dans {client_name} : {file_name} ({file['id']})")
-        return file["id"]
-
-    except HttpError as e:
-        print("⚠️ Erreur API Google :", e.content.decode("utf-8"))
-        raise
+    print(f"✅ Upload terminé : {file_name} ({file['id']})")
+    return file["id"]
 
 
 def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_app/Logos"):
-    # 📌 Créer un nouveau classeur Excel
+
     wb = Workbook()
     ws = wb.active
     ws.title = "Facturation"
     
-    # 📌 Styles
+
     header_font = Font(bold=True, size=14, color="000000")
     normal_font_black = Font(size=11, color="000000")
     normal_font_white = Font(size=11, color="FFFFFF")
@@ -441,7 +435,7 @@ def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_a
     left_alignment = Alignment(horizontal='left', vertical='center')
     COL_OFFSET = 4
     
-    # 📌 Mapping couleurs
+    
     color_map = {
         "Base cotisable": "9fc5e8", "Retenue CNAS employé": "9fc5e8",
         "Base imposable au baréme": "9fc5e8", "IRG barème": "9fc5e8",
@@ -473,7 +467,7 @@ def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_a
     else:
         print(f"⚠️ Logo introuvable pour {etablissement} ({logo_path})")
 
-    # 📌 Infos employé
+   
     infos_employe = [
         ["Nom:", employe_dict.get("Nom", "")],
         ["Prénom:", employe_dict.get("Prénom", "")],
@@ -486,7 +480,7 @@ def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_a
         ws.cell(row=i, column=COL_OFFSET, value=label).font = Font(bold=True)
         ws.cell(row=i, column=COL_OFFSET+1, value=value).font = normal_font_black
     
-    # 📌 Catégorisation clients
+ 
     clients_simples = ["Abbott", "Samsung"]
     client_sante = ["Siemens", "Healthineers","Siemens Energy", "Siemens Healthineers Oncology",
                     "Tango","Roche","CCIS ex SOGEREC","JTI","Philip Morris International",
@@ -1758,6 +1752,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
