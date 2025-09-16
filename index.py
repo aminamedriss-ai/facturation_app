@@ -454,12 +454,12 @@ def upload_to_drive(file_path, client_name, root_folder_id=None, drive_id=None):
     return file["id"]
 
 def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_app/Logos"):
-
+    # 📌 Créer un nouveau classeur Excel
     wb = Workbook()
     ws = wb.active
     ws.title = "Facturation"
     
-
+    # 📌 Styles
     header_font = Font(bold=True, size=14, color="000000")
     normal_font_black = Font(size=11, color="000000")
     normal_font_white = Font(size=11, color="FFFFFF")
@@ -471,7 +471,7 @@ def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_a
     left_alignment = Alignment(horizontal='left', vertical='center')
     COL_OFFSET = 4
     
-    
+    # 📌 Mapping couleurs
     color_map = {
         "Base cotisable": "9fc5e8", "Retenue CNAS employé": "9fc5e8",
         "Base imposable au baréme": "9fc5e8", "IRG barème": "9fc5e8",
@@ -503,7 +503,7 @@ def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_a
     else:
         print(f"⚠️ Logo introuvable pour {etablissement} ({logo_path})")
 
-   
+    # 📌 Infos employé
     infos_employe = [
         ["Nom:", employe_dict.get("Nom", "")],
         ["Prénom:", employe_dict.get("Prénom", "")],
@@ -516,7 +516,7 @@ def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_a
         ws.cell(row=i, column=COL_OFFSET, value=label).font = Font(bold=True)
         ws.cell(row=i, column=COL_OFFSET+1, value=value).font = normal_font_black
     
- 
+    # 📌 Catégorisation clients
     clients_simples = ["Abbott", "Samsung"]
     client_sante = ["Siemens", "Healthineers","Siemens Energy", "Siemens Healthineers Oncology",
                     "Tango","Roche","CCIS ex SOGEREC","JTI","Philip Morris International",
@@ -1666,7 +1666,8 @@ else:
                             # Choisir le bon taux en fonction de la sélection utilisateur
                             rate = euro_rate if st.session_state.devise_active == "EUR" else usd_rate
                             df_client["Facture HT en devise"] = df_client["Facture HT + NDF"] / rate
-               new_cols = pd.DataFrame({
+                # Construire un DataFrame avec toutes les nouvelles colonnes
+                new_cols = pd.DataFrame({
                     "Frais remboursement": df_client["Frais remboursement calcule"],
                     "Salaire de base": df_client["Salaire de base calcule"],
                     "Indemnité de panier": df_client["Indemnité de panier calcule"],
@@ -1678,7 +1679,7 @@ else:
 
                 # Fusionner en une seule fois
                 df_client = pd.concat([df_client, new_cols], axis=1).copy()
-                # st.write("Mois distincts trouvés :", df_client["Mois"].unique())
+
 
                 st.write(df_client.head(50)) # On peut encapsuler ton code de calculs dans une fonction
                 
@@ -1742,6 +1743,8 @@ else:
                         colonnes_mois.extend([c for c in df_pivot.columns if c.endswith(f"_{mois}")])
 
                     df_pivot = df_pivot[colonnes_identite + colonnes_mois]
+
+                
          
 
 
@@ -1780,6 +1783,7 @@ else:
                 # 📥 Génération et téléchargement PDF par employé
                 # ------------------------------------------------
                 st.markdown("### 📥 Télécharger la facture PDF par employé")
+
                 if nb_candidats == 1:
                     # Un seul candidat → on a déjà consolidé toutes les lignes dans employe_data
                     nom = employe_data.get("Nom", "employe").replace(" ", "_")
@@ -1842,47 +1846,9 @@ else:
 
 
 
+
             else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
