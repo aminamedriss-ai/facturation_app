@@ -331,8 +331,8 @@ def authenticate_drive():
     try:
         # Test: lister quelques fichiers accessibles
         results = service.files().list(pageSize=5, fields="files(id, name)").execute()
-        st.success("✅ Connexion Drive réussie")
-        st.write(results.get("files", []))
+        # st.success("✅ Connexion Drive réussie")
+        # st.write(results.get("files", []))
     except Exception as e:
         st.error(f"❌ Erreur connexion Drive: {e}")
 
@@ -1758,6 +1758,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
