@@ -328,6 +328,8 @@ def authenticate_drive():
         st.secrets["gcp_service_account"],  # 👈 lit depuis secrets.toml
         scopes=SCOPES
     )
+    st.write(type(st.secrets["gcp_service_account"]))
+    st.json(st.secrets["gcp_service_account"])
     return build("drive", "v3", credentials=creds)
 
 
@@ -1732,6 +1734,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
