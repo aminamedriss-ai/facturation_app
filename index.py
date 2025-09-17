@@ -443,12 +443,17 @@ def upload_to_drive(file_path, client_name, root_folder_id=None, drive_id=None):
             file_metadata["driveId"] = drive_id
 
         media = MediaFileUpload(file_path, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        file = service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields="id",
-            supportsAllDrives=True
-        ).execute()
+        try:
+            file = service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields="id",
+                supportsAllDrives=True
+            ).execute()
+        except HttpError as e:
+            st.error("⚠️ Erreur API Google Drive")
+            st.code(e.content.decode("utf-8") if hasattr(e, "content") else str(e))
+            raise
 
     print(f"✅ Fichier disponible dans {client_name} : {file_name} ({file['id']})")
     return file["id"]
@@ -1851,4 +1856,5 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
