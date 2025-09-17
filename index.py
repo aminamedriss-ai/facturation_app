@@ -1261,7 +1261,7 @@ else:
                 else:
                     df_client["Base cotisable"] = (
                             
-                         df_client["Salaire de base calcule"] + df_client["Prime mensuelle (Barème) (DZD)"] 
+                         df_client["Salaire de base calcule"] + df_client["Prime mensuelle (Barème) (DZD)"]  + df_client["Indemnité non cotisable et imposable 10% (DZD)"]
                         )
                 df_client["indémnité Véhicule"] = df_client["indémnité Véhicule calcule"]
                 if df_client["Etablissement"].iloc[0] == "LG" :
@@ -1856,6 +1856,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
