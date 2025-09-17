@@ -1173,7 +1173,7 @@ else:
                 salaire_journalier = df_client["Salaire de base calcule"] / jours_mois
                 df_client["Salaire de base calcule"] = (
                     (df_client["Salaire de base calcule"]
-                    - df_client["Salaire de base calcule"] / 30 * absences_total
+                    - df_client["Salaire de base calcule"] / 30 * (absences_total+df_client["Nbr jours STC (jours)"])
                     + df_client["Salaire de base calcule"] / HEURES_MOIS * (
                         df_client["Heures supp 100% (H)"] * 2
                         + df_client["Heures supp 75% (H)"] * 1.75
@@ -1183,7 +1183,7 @@ else:
                     
                 )
                 df_client["IFSP (20% du salaire de base)"] = df_client["IFSP (20% du salaire de base) calcule"]
-                df_client["Salaire de base calcule"] = df_client["Salaire de base calcule"] - (df_client["Salaire de base calcule"]/jours_mois) * df_client["Nbr jours STC (jours)"]
+                # df_client["Salaire de base calcule"] = df_client["Salaire de base calcule"] - (df_client["Salaire de base calcule"]/jours_mois) * df_client["Nbr jours STC (jours)"]
                 # Ajout régul seulement si Base de régul == "Salaire de base"
                 df_client["Salaire de base calcule"] += np.where(
                     df_client["Base de régul"] == "Salaire de base", df_client["Régul"], 0)
@@ -1856,6 +1856,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
