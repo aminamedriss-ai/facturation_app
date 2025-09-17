@@ -1225,7 +1225,7 @@ else:
                     
                     df_client["Indemnité 22jours"] = (
                         df_client["Indemnitésomme"]
-                        - (df_client["Indemnitésomme"] / 22 * (absences_total22 + df_client["jours stc ouvres"]))
+                        - (df_client["Indemnitésomme"] / 22 * (absences_total22 ))
                         + (df_client["Indemnitésomme"] / 22 * (
                             (df_client["Heures supp 100% (H)"] * 2) / 8
                             + (df_client["Heures supp 75% (H)"] * 1.75) / 8
@@ -1856,6 +1856,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
