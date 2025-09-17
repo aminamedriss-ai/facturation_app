@@ -1219,10 +1219,10 @@ else:
                  )
                     df_client["Indemnitésomme"]= df_client["Indemnité de panier calcule"] + df_client["Indemnité de transport calcule"] + df_client["Prime vestimentaire (DZD)"] + df_client["indémnité Véhicule calcule"]+df_client["Avance NET (DZD)"] 
                     df_client["Indemnité 22jours"] = df_client["Indemnitésomme"]
-                    print(df_client["Indemnité 22jours"])
+                    # print(df_client["Indemnité 22jours"])
                 else:
                     df_client["Indemnitésomme"]= df_client["Indemnité de panier calcule"] + df_client["Indemnité de transport calcule"] + df_client["Prime vestimentaire (DZD)"] + df_client["indémnité Véhicule calcule"]+df_client["Avance NET (DZD)"] 
-                    print(df_client["Indemnitésomme"])
+                    st.write(df_client["Indemnitésomme"])
                     df_client["Indemnité 22jours"] = (
                         df_client["Indemnitésomme"]
                         - (df_client["Indemnitésomme"] / 22 * (absences_total22 ))
@@ -1232,7 +1232,7 @@ else:
                             + (df_client["Heures supp 50% (H)"] * 1.5) / 8
                         ))
                     )
-                    print(df_client["Indemnité 22jours"])
+                    st.write(df_client["Indemnité 22jours"])
                     # print(df_client["Indemnité de panier calcule"])
                     # print(df_client["Indemnité de transport calcule"])
                     # print(df_client["Prime vestimentaire (DZD)"])
@@ -1241,7 +1241,7 @@ else:
                     # print(df_client["Indemnitésomme"])
                     
                 df_client["Indemnité 22jours"]= df_client["Indemnité 22jours"] - ((df_client["Indemnité 22jours"]/22) * df_client["jours stc ouvres"])
-                print(df_client["Indemnité 22jours"])
+                st.write(df_client["Indemnité 22jours"])
                 if df_client["Etablissement"].iloc[0] == "LG":
                     df_client["Indemnitésomme"]= df_client["Indemnité de panier calcule"] + df_client["Indemnité de transport calcule"] + df_client["Prime vestimentaire (DZD)"] + df_client["indémnité Véhicule calcule"]+df_client["Avance NET (DZD)"] 
                     
@@ -1858,6 +1858,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
