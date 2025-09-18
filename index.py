@@ -686,7 +686,7 @@ def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_a
 
         generer_tableau(10, "Récapitulatif salarial", lignes)
     if not mois_disponibles:
-    print(f"⚠️ Aucun mois trouvé pour {employe_dict.get('Nom','')} - {etablissement}")
+        print(f"⚠️ Aucun mois trouvé pour {employe_dict.get('Nom','')} - {etablissement}")
 
     # 📌 Largeur colonnes
     for col in range(COL_OFFSET, COL_OFFSET + len(mois_disponibles) + 2):
@@ -1860,6 +1860,7 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+
 
 
 
