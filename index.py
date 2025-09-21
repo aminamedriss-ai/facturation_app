@@ -687,6 +687,7 @@ def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_a
         generer_tableau(10, "Récapitulatif salarial", lignes)
     if not mois_disponibles:
         print(f"⚠️ Aucun mois trouvé pour {employe_dict.get('Nom','')} - {etablissement}")
+    print(f"▶️ Génération facture : {matricule} - {nom} - mois dispo: {mois_disponibles}")
 
     # 📌 Largeur colonnes
     for col in range(COL_OFFSET, COL_OFFSET + len(mois_disponibles) + 2):
@@ -1689,9 +1690,12 @@ else:
                 # Fusionner en une seule fois
                 df_client = pd.concat([df_client, new_cols], axis=1).copy()
 
+                print("👀 Employés bruts dans df_client :", df_client["Nom"].unique())
 
                 st.write(df_client.head(50)) # On peut encapsuler ton code de calculs dans une fonction
-                
+                print(df_client[["Nom","N°"]])
+                print(df_client.query("Nom == 'AMALOU'")[["Nom", "N°", "Mois"]])
+
                 # 1. On définit les colonnes fixes (identité employé)
                 # Colonnes fixes (identité employé)
                 mois_ordre = [
@@ -1700,7 +1704,7 @@ else:
                 ]
 
 
-                id_cols = ["Nom", "Prénom", "N°", "Titre du poste", "Durée du CDD (Mois)", "Etablissement", "Année"]
+                id_cols = ["Nom", "Prénom", "N°",  "Etablissement", "Année"]
 
                 # Colonnes variables (toutes sauf identités + Mois)
                 val_cols = [c for c in df_client.columns if c not in id_cols + ["Mois"]]
@@ -1734,16 +1738,35 @@ else:
 
                 else:
                     # Plusieurs candidats → pivot classique
-                    df_pivot = df_client.pivot_table(
-                    index=id_cols,
-                    columns="Mois",
-                    values=val_cols,
-                    aggfunc="first"
-                )
+                    # Pivot avec somme (ou autre agrégation)
+                    # df_pivot = (
+                    #     df_client
+                    #     .groupby(id_cols + ["Mois"])[val_cols]
+                    #     .sum(min_count=1)   # garde NaN si tout est vide
+                    #     .unstack(fill_value=None)
+                    # )
+                    df_pivot = (
+                        df_client
+                        .groupby(id_cols + ["Mois"], dropna=False)[val_cols]
+                        .sum(min_count=1)
+                        .unstack(fill_value=None)
+                    )
 
-                    # Aplatir le MultiIndex
+                    # Aplatir MultiIndex colonnes
                     df_pivot.columns = [f"{val}_{mois}" for val, mois in df_pivot.columns]
-                    df_pivot = df_pivot.reset_index()
+
+                    # ✅ Forcer la présence de tous les employés
+                    tous_employes = df_client[id_cols].drop_duplicates().set_index(id_cols)
+
+                    df_pivot = (
+                        df_pivot
+                        .reindex(pd.MultiIndex.from_frame(tous_employes.reset_index()))
+                        .reset_index()
+                    )
+                    
+
+
+
 
                     # Réordonner les colonnes par mois_ordre
                     colonnes_identite = id_cols
@@ -1753,12 +1776,8 @@ else:
 
                     df_pivot = df_pivot[colonnes_identite + colonnes_mois]
 
-                
-         
+                    print(df_pivot[["Nom","N°"]])
 
-
-
-               
                 # 📥 Génération et téléchargement Excel
                 # --------------------------------------
                 output = io.BytesIO()
@@ -1800,7 +1819,7 @@ else:
 
                     # Générer le fichier Excel
                     fichier_excel = generer_facture_excel(employe_data, f"{matricule}_{nom}_facture.xlsx")
-
+                    
                     # Lecture pour Streamlit
                     with open(fichier_excel, "rb") as f:
                         excel_data = f.read()
@@ -1833,6 +1852,7 @@ else:
                         employe_data = row.to_dict()
 
                         fichier_excel = generer_facture_excel(employe_data, f"{matricule}_{nom}_facture.xlsx")
+                        print("📊 Employés présents dans df_pivot :", df_pivot["Nom"].unique())
 
                         with open(fichier_excel, "rb") as f:
                             excel_data = f.read()
@@ -1860,16 +1880,3 @@ else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
-
-
-
-
-
-
-
-
-
-
-
-
-
