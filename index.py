@@ -1201,7 +1201,7 @@ else:
                         ))
                     )
                    
-                    df_client["Indemnité 22jours"]= df_client["Indemnité 22jours"] - ((df_client["Indemnité 22jours"]/22) * df_client["Nbr jours STC (jours)"])
+                    # df_client["Indemnité 22jours"]= df_client["Indemnité 22jours"] - ((df_client["Indemnité 22jours"]/22) * df_client["Nbr jours STC (jours)"])
                 # st.write(df_client["Indemnité 22jours"].head(133))
                 if df_client["Etablissement"].iloc[0] == "LG":
                     df_client["Indemnitésomme"]= df_client["Indemnité de panier calcule"] + df_client["Indemnité de transport calcule"] + df_client["Prime vestimentaire (DZD)"] + df_client["indémnité Véhicule calcule"]+df_client["Avance NET (DZD)"] 
@@ -1830,3 +1830,4 @@ else:
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
             
+
