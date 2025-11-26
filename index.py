@@ -34,6 +34,11 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.errors import HttpError
 import os, pickle
+import webbrowser
+import threading
+import time
+import pkg_resources
+
 # 📷 Afficher un logo
 st.set_page_config(
     page_title="Gestion de la Facturation",
@@ -320,32 +325,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 from openpyxl.utils import get_column_letter
 from google.oauth2 import service_account
-# SCOPES = ["https://www.googleapis.com/auth/drive"]
-# FOLDER_ID = "1vhxSZ3jtWEqLocQ7yx9AcsSCiVowbFve"  # ton dossier partagé
 
-# def test_service_account_access():
-#     # Authentification avec st.secrets
-#     creds = service_account.Credentials.from_service_account_info(
-#         st.secrets["gcp_service_account"], scopes=SCOPES
-#     )
-#     service = build("drive", "v3", credentials=creds)
-
-#     try:
-#         # Vérifier accès au dossier
-#         folder = service.files().get(
-#             fileId=FOLDER_ID,
-#             fields="id, name, mimeType, owners"
-#         ).execute()
-
-#         st.success(f"✅ Accès OK au dossier : {folder['name']} (ID: {folder['id']})")
-#         st.write(f"Propriétaire : {folder['owners'][0]['emailAddress']}")
-
-#     except Exception as e:
-#         st.error("❌ Accès refusé :")
-#         st.exception(e)
-
-# # Exécution
-# test_service_account_access()
 def authenticate_drive():
     creds = service_account.Credentials.from_service_account_info(
         st.secrets["gcp_service_account"],
@@ -458,13 +438,11 @@ def upload_to_drive(file_path, client_name, root_folder_id=None, drive_id=None):
     print(f"✅ Fichier disponible dans {client_name} : {file_name} ({file['id']})")
     return file["id"]
 
-def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_app/Logos"):
-    # 📌 Créer un nouveau classeur Excel
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Facturation"
-    
+
+def generer_facture_excel_sheet(employe_dict, ws, wb, logos_folder="facturation_app/Logos"):
     # 📌 Styles
+    
+#     # 📌 Styles
     header_font = Font(bold=True, size=14, color="000000")
     normal_font_black = Font(size=11, color="000000")
     normal_font_white = Font(size=11, color="FFFFFF")
@@ -483,32 +461,30 @@ def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_a
         "Base imposable 10%": "9fc5e8", "IRG 10%": "9fc5e8",
         "Salaire brut": "9fc5e8", "CNAS employeur": "9fc5e8",
         "Cotisation œuvre sociale": "9fc5e8", "Taxe formation": "9fc5e8",
-        "Taxe formation et os": "9fc5e8", "Frais téléphone": "9fc5e8",
-        "Frais de transport (Yassir)": "9fc5e8", "Frais divers": "9fc5e8",
+        "Taxe formation et os": "9fc5e8", 
         "Coût congé payé": "9fc5e8", "Taux complément santé (DZD)": "9fc5e8",
         "Fees etalent": "9fc5e8", "TAP": "9fc5e8",
         "Salaire net": "25488e", "Masse salariale": "25488e", "Coût salaire": "25488e",
-        "Facture HT": "e11b36",
-        "NDF": "284052", "Facture TVA": "284052", "Facture TTC": "284052",
+        "Facture HT": "e11b36","Facture TVA": "284052", "Facture TTC": "284052",
     }
     white_text_lines = {"Salaire net", "Masse salariale", "Coût salaire",
-                        "Facture HT", "NDF", "Facture TVA", "Facture TTC"}
+                        "Facture HT", "Facture TVA", "Facture TTC"}
     
-    # 📌 Logo client
+
+    # ---------------------- LOGO ----------------------
     etablissement = str(employe_dict.get("Etablissement", "")).strip()
     logo_path = os.path.join(logos_folder, f"{etablissement}.png")
+
     if os.path.exists(logo_path):
         try:
             logo = XLImage(logo_path)
-            logo.width = 400
-            logo.height = 130
+            logo.width = 350
+            logo.height = 120
             ws.add_image(logo, f"{get_column_letter(COL_OFFSET+4)}1")
-        except Exception as e:
-            print(f"⚠️ Impossible d’insérer le logo pour {etablissement}: {e}")
-    else:
-        print(f"⚠️ Logo introuvable pour {etablissement} ({logo_path})")
+        except:
+            pass
 
-    # 📌 Infos employé
+    # ---------------------- INFOS EMPLOYE ----------------------
     infos_employe = [
         ["Nom:", employe_dict.get("Nom", "")],
         ["Prénom:", employe_dict.get("Prénom", "")],
@@ -517,56 +493,46 @@ def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_a
         ["Durée CDD:", employe_dict.get("Durée du CDD (Mois)", "")],
         ["Établissement:", etablissement]
     ]
+
     for i, (label, value) in enumerate(infos_employe, start=3):
         ws.cell(row=i, column=COL_OFFSET, value=label).font = Font(bold=True)
         ws.cell(row=i, column=COL_OFFSET+1, value=value).font = normal_font_black
-    
     # 📌 Catégorisation clients
-    clients_simples = ["Abbott", "Samsung"]
-    client_sante = ["Siemens", "Healthineers","Siemens Energy", "Siemens Healthineers Oncology",
-                    "Tango","Roche","CCIS ex SOGEREC","JTI","Philip Morris International",
-                    "Wilhelmsen", "IPSEN", "LG"]
-    client_os = ["Maersk", "Henkel"]
-    client_change = ["Epson"]
-    client_change_phone = ["Cahors"]
-    client_ndf = ["Syngenta"]
-    client_gd = ["G+D"]
-
-    # 📌 Récupération des mois
+        clients_simples = ["Abbott", "Samsung"]
+        client_sante = ["Siemens", "Healthineers","Siemens Energy", "Siemens Healthineers Oncology",
+                        "Tango","CCIS ex SOGEREC","JTI",
+                        "Wilhelmsen", "IPSEN", "LG","INTERTEK","Castel el Djazair"]
+        client_os = ["Maersk", "Henkel"]
+        client_change = ["Epson"]
+        client_change_phone = ["Cahors"]
+        client_ndf = ["Syngenta"]
+        client_gd = ["G+D"]
+        client_PMI=["Philip Morris International","Roche"]
+    # ---------------------- EXTRACTION DES MOIS ----------------------
     mois_data = {}
     for key, value in employe_dict.items():
-        if '_' in key:
-            ligne_nom, mois_nom = key.rsplit('_', 1)
+        if "_" in key:
+            ligne_nom, mois_nom = key.rsplit("_", 1)
             mois_data.setdefault(mois_nom, {})[ligne_nom] = value
 
     def is_useful_value(v):
-        """Retourne True si la valeur est utile (non NaN, non vide)."""
         if v is None:
             return False
-        # float NaN
         try:
             if isinstance(v, float) and math.isnan(v):
                 return False
-        except Exception:
+        except:
             pass
-        # NaN-like
-        try:
-            if v != v:
-                return False
-        except Exception:
-            pass
-        # chaînes "vides"
         if isinstance(v, str):
-            s = v.strip().lower()
-            if s == "" or s in ("nan", "none", "na", "<na>", "null"):
+            if v.strip().lower() in ("", "nan", "none", "null"):
                 return False
             return True
         return True
 
-    # ✅ garder uniquement les mois qui ont AU MOINS une valeur utile
-    mois_disponibles = [m for m, lignes in mois_data.items() if any(is_useful_value(v) for v in lignes.values())]
+    mois_disponibles = [m for m, lignes in mois_data.items()
+                        if any(is_useful_value(v) for v in lignes.values())]
 
-    # 📌 Fonction pour générer un tableau
+    # ---------------------- TABLEAU ----------------------
     def generer_tableau(start_row, titre, lignes):
         # Titre tableau
         ws.merge_cells(start_row=start_row, start_column=COL_OFFSET, 
@@ -619,15 +585,14 @@ def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_a
     if etablissement in client_gd:
         start_row = 10
         start_row = generer_tableau(start_row, "Récapitulatif salarial",
-            ["Salaire de base", "Prime mensuelle", "Prime exeptionnelle (10%) (DZD)",
-             "Indemnités Non Cotisable - Mensuelle | Panier, Transport", 
-             "Salaire net", "Facture HT","Facture TVA", "Facture TTC"])
-        start_row = generer_tableau(start_row, "Travel Expenses",
-            ["Travel expenses M segment", "Travel expenses C segment"])
-        start_row = generer_tableau(start_row, "Allowance",
-            ["Allowance M segment", "Allowance C segment"])
+            ["Salaire de base","Indemnités Non Cotisable - Mensuelle | Panier, Transport", "Prime mensuelle", "Frais de remboursement (Véhicule) (DZD)",
+             "Salaire net","Coût salaire", "Facture HT","Facture TVA", "Facture TTC"])
+#         # start_row = generer_tableau(start_row, "Travel Expenses",
+#         #     ["Travel expenses M segment", "Travel expenses C segment"])
+#         # start_row = generer_tableau(start_row, "Allowance",
+#         #     ["Allowance M segment", "Allowance C segment"])
 
-    # 📌 Tous les autres clients
+#     # 📌 Tous les autres clients
     else:
         if etablissement in clients_simples:
             lignes = ["Salaire de base", "Prime mensuelle", "Prime exeptionnelle (10%) (DZD)",
@@ -657,25 +622,32 @@ def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_a
                       "Base cotisable", "Retenue CNAS employé", "Base imposable au baréme","IRG barème",
                       "Base imposable 10%", "IRG 10%","Salaire net","Salaire brut", "CNAS employeur",
                       "Cotisation œuvre sociale", "Taxe formation", "Masse salariale", 
-                      "Coût congé payé","Frais téléphone","Frais de transport (Yassir)","Frais divers",
-                      "Coût salaire","Fees etalent", "Facture HT","Facture HT en devise","Facture TVA", "Facture TTC"]
+                      "Coût congé payé",
+                      "Coût salaire","Fees etalent", "Facture HT","Facture TVA","Facture TTC","Facture HT en devise","Facture TTC en devise"]
         elif etablissement in client_change_phone:
             lignes = ["Salaire de base", "Prime mensuelle", "Prime exeptionnelle (10%) (DZD)",
                       "Indemnités Non Cotisable - Mensuelle | Panier, Transport", "Frais remboursement",
                       "Base cotisable", "Retenue CNAS employé", "Base imposable au baréme","IRG barème",
                       "Base imposable 10%", "IRG 10%","Salaire net","Salaire brut", "CNAS employeur",
                       "Cotisation œuvre sociale", "Taxe formation", "Masse salariale", 
-                      "Coût congé payé","Frais de transport (Yassir)","Frais divers",
-                      "Coût salaire","Fees etalent", "Facture HT","Facture HT en devise","Facture TVA", "Facture TTC"]
+                      "Coût congé payé","Coût salaire","Fees etalent", "Facture HT", "Facture TVA","Facture TTC","Facture HT en devise","Facture TTC en devise"]
         elif etablissement in client_ndf:
             lignes = ["Salaire de base", "Prime mensuelle", "Prime exeptionnelle (10%) (DZD)",
                       "Prime vestimentaire (DZD)","Indemnités Non Cotisable - Mensuelle | Panier, Transport", 
                       "Frais remboursement","Base cotisable", "Retenue CNAS employé", "Base imposable au baréme",
                       "IRG barème","Base imposable 10%", "IRG 10%","Salaire net","Salaire brut", "CNAS employeur",
                       "Cotisation œuvre sociale", "Taxe formation", "Masse salariale", 
-                      "Coût congé payé","Coût salaire","Fees etalent", "Facture HT","NDF","Facture TVA", "Facture TTC"]
+                      "Coût congé payé","Coût salaire","Fees etalent", "Facture HT","Facture TVA", "Facture TTC"]
+        elif etablissement in client_PMI:
+            lignes = ["Salaire de base", "Prime mensuelle (Barème) (DZD)", "Prime exeptionnelle (10%) (DZD)",
+                      "Prime vestimentaire (DZD)", "Indemnités Non Cotisable - Mensuelle | Panier, Transport", 
+                      "Frais remboursement","Base cotisable", "Retenue CNAS employé", "Base imposable au baréme",
+                      "IRG barème","Base imposable 10%", "IRG 10%","Salaire net","Salaire brut", "CNAS employeur",
+                      "Cotisation œuvre sociale", "Taxe formation", "Masse salariale", 
+                      "Coût congé payé","Taux complément santé (DZD)","Coût salaire","Fees etalent", 
+                      "Facture HT","Facture TVA", "Facture TTC"]
         else:
-            lignes = ["Salaire de base","IFSP (20% du salaire de base)", "Prime mensuelle",  
+            lignes = ["Salaire de base","IFSP (20% du salaire de base)", "Prime mensuelle (Barème) (DZD)",  
                       "Prime exeptionnelle (10%) (DZD)", "Indemnité de panier","indémnité Véhicule",  
                       "Indemnités Non Cotisable - Mensuelle | Panier, Transport", "Frais remboursement",
                       "Base cotisable", "Retenue CNAS employé", "Base imposable au baréme","IRG barème",
@@ -684,41 +656,32 @@ def generer_facture_excel(employe_dict, nom_fichier, logos_folder="facturation_a
                       "Coût congé payé","Taux complément santé (DZD)","Coût salaire","Fees etalent", 
                       "Facture HT", "Facture TTC"]
 
-        generer_tableau(10, "Récapitulatif salarial", lignes)
-    if not mois_disponibles:
-        print(f"⚠️ Aucun mois trouvé pour {employe_dict.get('Nom','')} - {etablissement}")
-    print(f"▶️ Génération facture : {matricule} - {nom} - mois dispo: {mois_disponibles}")
 
-    # 📌 Largeur colonnes
+    generer_tableau(10, "Récapitulatif salarial", lignes)
+
     for col in range(COL_OFFSET, COL_OFFSET + len(mois_disponibles) + 2):
-        ws.column_dimensions[get_column_letter(col)].width = 40
+        ws.column_dimensions[get_column_letter(col)].width = 35
+
     ws.freeze_panes = "E1"
 
-    # 📌 Sauvegarde
-    if not nom_fichier.endswith('.xlsx'):
-        nom_fichier += '.xlsx'
-    wb.save(nom_fichier)
-    # drive_file_id = upload_to_drive(nom_fichier, client_name=etablissement, root_folder_id="1vhxSZ3jtWEqLocQ7yx9AcsSCiVowbFve")
-
-
-    return nom_fichier
+    
 def calcul_cout_conge(row):
     # Cas 1 : augmentation ou nouveau salaire
-    if row["Augmentation state"] == "Yes" or row["Nouveau Salaire de base (DZD)"] != 0:
+    # if row["Augmentation state"] == "Yes" or row["Nouveau Salaire de base (DZD)"] != 0:
         
-        Masse_salariale = (
-                    row["Salaire brut"] +
-                    row["CNAS employeur"] +
-                    row["Cotisation œuvre sociale"] +
-                    row["Taxe formation"]
-                )
-        cout_conge = (Masse_salariale / 30 * 2.5)
-    else:
+    #     Masse_salariale = (
+    #                 row["Salaire brut"] +
+    #                 row["CNAS employeur"] +
+    #                 row["Cotisation œuvre sociale"] +
+    #                 row["Taxe formation"]
+    #             )
+    #     cout_conge = (Masse_salariale *(2.5/30))
+    # else:
         # Cas 2 : pas d’augmentation → on garde le coût congé payé existant
-        cout_conge = row["Coût congé payé"]
+    cout_conge = row["Coût congé payé"]
 
     # Ajout régul si "Congé payé"
-    cout_conge += row["Régul"] if row["Base de régul"] == "Congé payé" else 0
+    # cout_conge += row["Régul"] if row["Base de régul"] == "Congé payé" else 0
     return cout_conge
 USERS_FILE = "users.json"
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -807,7 +770,7 @@ else:
             "Cahors", "Philip Morris International", "Siemens", "Syngenta", "LG",
             "Epson", "EsteL", "JTI", "Siemens Energy", "Wilhelmsen",
             "Healthineers", "Contrat auto-entrepreneur", "Coca Cola", "IPSEN", "SOGEREC","CCIS ex SOGEREC",
-            "Roche", "Tango", "VARION"
+            "Roche", "Tango", "VARION","Castel el Djazair","INTERTEK"
         ]
         with open(CLIENTS_FILE, "w", encoding="utf-8") as f:
             json.dump(clients_list, f, ensure_ascii=False, indent=2)
@@ -858,24 +821,24 @@ else:
             # df_full.rename(columns=lambda col: MOIS_MAP.get(col, col), inplace=True)
             # Nettoyer colonnes texte (uniquement object/string)
             # Colonnes à NE PAS nettoyer (texte pur)
-            cols_a_nettoyer = ["Travel expenses M segment", "Travel expenses C segment", "Allowance M segment", "Allowance C segment"]
+            # cols_a_nettoyer = ["Travel expenses M segment", "Travel expenses C segment", "Allowance M segment", "Allowance C segment"]
 
             # Colonnes candidates au nettoyage
             # cols_a_nettoyer = [c for c in df_full.columns if c not in cols_texte]
 
-            for col in cols_a_nettoyer:
-                if df_full[col].dtype == "object":  # seulement object
-                    df_full[col] = (
-                        df_full[col]
-                        .astype(str)
-                        .str.replace("\u202f", "", regex=False)  # supprime espaces insécables
-                        .str.replace(" ", "", regex=False)       # supprime espaces normaux
-                        .str.replace(",", ".", regex=False)      # remplace virgule par point
-                        .str.replace(r"[^\d\.-]", "", regex=True)  # garde chiffres, . et -
-                        .replace("", "0")
-                        .astype(float)
-                    )
-                    df_full[col] = pd.to_numeric(df_full[col], errors="coerce")
+            # for col in cols_a_nettoyer:
+            #     if df_full[col].dtype == "object":  # seulement object
+            #         df_full[col] = (
+            #             df_full[col]
+            #             .astype(str)
+            #             .str.replace("\u202f", "", regex=False)  # supprime espaces insécables
+            #             .str.replace(" ", "", regex=False)       # supprime espaces normaux
+            #             .str.replace(",", ".", regex=False)      # remplace virgule par point
+            #             .str.replace(r"[^\d\.-]", "", regex=True)  # garde chiffres, . et -
+            #             .replace("", "0")
+            #             .astype(float)
+            #         )
+            #         df_full[col] = pd.to_numeric(df_full[col], errors="coerce")
 
 
             # # Convertir en float si possible
@@ -1105,10 +1068,10 @@ else:
                     "Prime vestimentaire (DZD)", "Nouvelle Indemnité de panier (DZD)",  "Nouvelle Indemnité de transport (DZD)",
                     "Nouvelle Prime mensuelle (DZD)", "Nouveaux Frais de remboursement (Véhicule) (DZD)","Prime vestimentaire (DZD)", "Indémnité Véhicule (DZD)",
                     "Absence (Jour)","Absence Maladie (Jour)","Absence Maternité (Jour)", "Absence Mise à pied (Jour)", "Jours de congé (Jour)",
-                    "Heures supp 100% (H)", "Heures supp 75% (H)", "Heures supp 50% (H)", "Jours supp (Jour)","Taux complément santé (DZD)","Frais téléphone",
-                    "Frais de transport (Yassir)","Frais divers","Avance NET (DZD)","Augmentation", "Régul", "Coût congé payé", "Nbr jours STC (jours)",
-                    "Jours de congé (22 jours)","Indemnité non cotisable et imposable 10% (DZD)","Indemnité zone", "Total absence (sur 22 jours)",
-                    "Nouvelle indémnité Véhicule (DZD)","Nouveau IFSP (20% du salaire de base)","Nbr jours augmentation","Indemnité de départ (Net)",
+                    "Heures supp 100% (H)", "Heures supp 75% (H)", "Heures supp 50% (H)", "Jours supp (Jour)","Taux complément santé (DZD)",
+                   "Avance NET (DZD)", "Coût congé payé", "Nbr jours STC (jours)",
+                    "Jours de congé ouvré(22 jours)","Indemnité non cotisable et imposable 10% (DZD)", "Total absence (sur 22 jours)",
+                    "Nouvelle indémnité Véhicule (DZD)","Nouveau IFSP (20% du salaire de base)","Indemnité de départ (Net)",
                     "Allocation Aid El Adha NET"
                 ]
               
@@ -1121,7 +1084,7 @@ else:
                         df_client[col] = nettoyer_colonne(df_client, col)
                     else:
                         df_client[col] = 0.0
-                col_pourcentage = ["Fees etalent", "TVA"]
+                col_pourcentage = ["Fees etalent"]
 
                 for col in col_pourcentage:
                     df_client[col] = (
@@ -1135,7 +1098,7 @@ else:
                         .astype(float)
                     )
                 
-                df_client["NDF"]= df_client["NDF"].fillna(0)                                 
+                # df_client["NDF"]= df_client["NDF"].fillna(0)                                 
                 # df_client["jours conge ouvres"] = df_client.apply(calcul_jours_ouvres, axis=1)
                 
                 df_client["jours stc ouvres"] = df_client.apply(calcul_joursstc_ouvres, axis=1)
@@ -1146,10 +1109,10 @@ else:
                 + df_client["Absence Mise à pied (Jour)"]
                 + df_client["Jours de congé (Jour)"]  # version brute
             )
-                print(df_client["Jours de congé (22 jours)"])
+                print(df_client["Jours de congé ouvré(22 jours)"])
                 absences_total22 = (
                     df_client["Total absence (sur 22 jours)"]
-                    + df_client["Jours de congé (22 jours)"]  # version corrigée week-end
+                    + df_client["Jours de congé ouvré(22 jours)"]  # version corrigée week-end
                 )
                 absences_totallg = (
                 df_client["Absence (Jour)"]
@@ -1170,13 +1133,13 @@ else:
                 df_client["IFSP (20% du salaire de base) calcule"] = get_valeur("IFSP (20% du salaire de base)", "Nouveau IFSP (20% du salaire de base)")
                 df_client["Frais remboursement calcule"] = get_valeur("Frais de remboursement (Véhicule) (DZD)", "Nouveaux Frais de remboursement (Véhicule) (DZD)")
                 # print(df_client["Salaire de base calcule"])
-                df_client["Salaire de base calcule"] = ((df_client["Salaire de base calcule"]/30)*(30-df_client["Nbr jours augmentation"]))+(((df_client["Salaire de base calcule"] * (1 + (df_client["Augmentation"] / 100)))/30 )*df_client["Nbr jours augmentation"])
+                # df_client["Salaire de base calcule"] = ((df_client["Salaire de base calcule"]/30)*(30-df_client["Nbr jours augmentation"]))+(((df_client["Salaire de base calcule"] * (1 + (df_client["Augmentation"] / 100)))/30 )*df_client["Nbr jours augmentation"])
                 # df_client["Salaire de base calcule"] = (df_client["Salaire de base calcule"] * (1 + (df_client["Augmentation"] / 100)))
                 df_client["Salaire de base calcule"] += df_client["IFSP (20% du salaire de base) calcule"]
                 salaire_journalier = df_client["Salaire de base calcule"] / jours_mois
                 df_client["Salaire de base calcule"] = (
                     (df_client["Salaire de base calcule"]
-                    - df_client["Salaire de base calcule"] / 30 * (absences_total+df_client["Nbr jours STC (jours)"])
+                    - df_client["Salaire de base calcule"] / 30 * (absences_total)
                     + df_client["Salaire de base calcule"] / HEURES_MOIS * (
                         df_client["Heures supp 100% (H)"] * 2
                         + df_client["Heures supp 75% (H)"] * 1.75
@@ -1185,14 +1148,15 @@ else:
                     + (df_client["Jours supp (Jour)"] * salaire_journalier)) 
                     
                 )
+                
                 df_client["IFSP (20% du salaire de base)"] = df_client["IFSP (20% du salaire de base) calcule"]
                 # df_client["Salaire de base calcule"] = df_client["Salaire de base calcule"] - (df_client["Salaire de base calcule"]/jours_mois) * df_client["Nbr jours STC (jours)"]
                 # Ajout régul seulement si Base de régul == "Salaire de base"
-                df_client["Salaire de base calcule"] += np.where(
-                    df_client["Base de régul"] == "Salaire de base", df_client["Régul"], 0)
+                # df_client["Salaire de base calcule"] += np.where(
+                    # df_client["Base de régul"] == "Salaire de base", df_client["Régul"], 0)
 
                 print(absences_total22)
-                if df_client["Etablissement"].iloc[0] == "Coca cola": 
+                if df_client["Etablissement"].iloc[0] == "Coca Cola": 
                     df_client["Indemnité de panier calcule"] = (
                     df_client["Indemnité de panier calcule"]
                     - (df_client["Indemnité de panier calcule"] / 26 * absences_total22)
@@ -1220,11 +1184,12 @@ else:
                         + (df_client["Heures supp 50% (H)"] ) / 8
                     ))
                  )
-                    df_client["Indemnitésomme"]= df_client["Indemnité de panier calcule"] + df_client["Indemnité de transport calcule"] + df_client["Prime vestimentaire (DZD)"] + df_client["indémnité Véhicule calcule"]+df_client["Avance NET (DZD)"] 
+              
+                    df_client["Indemnitésomme"]= df_client["Indemnité de panier calcule"] + df_client["Indemnité de transport calcule"] + df_client["Prime vestimentaire (DZD)"] + df_client["indémnité Véhicule calcule"]+df_client["Frais remboursement calcule"]
                     df_client["Indemnité 22jours"] = df_client["Indemnitésomme"]
                     # print(df_client["Indemnité 22jours"])
                 else:
-                    df_client["Indemnitésomme"]= df_client["Indemnité de panier calcule"] + df_client["Indemnité de transport calcule"] + df_client["Prime vestimentaire (DZD)"] + df_client["indémnité Véhicule calcule"]+df_client["Avance NET (DZD)"] 
+                    df_client["Indemnitésomme"]= df_client["Indemnité de panier calcule"] + df_client["Indemnité de transport calcule"] + df_client["Prime vestimentaire (DZD)"] + df_client["indémnité Véhicule calcule"]
                     # st.write(df_client["Indemnitésomme"].head(133))
                     df_client["Indemnité 22jours"] = (
                         df_client["Indemnitésomme"]
@@ -1235,15 +1200,8 @@ else:
                             + (df_client["Heures supp 50% (H)"] * 1.5) / 8
                         ))
                     )
-                    # st.write(df_client["Indemnité 22jours"].head(133))
-                    # print(df_client["Indemnité de panier calcule"])
-                    # print(df_client["Indemnité de transport calcule"])
-                    # print(df_client["Prime vestimentaire (DZD)"])
-                    # print(df_client["indémnité Véhicule calcule"])
-                    # print(df_client["Avance NET (DZD)"])
-                    # print(df_client["Indemnitésomme"])
-                    
-                df_client["Indemnité 22jours"]= df_client["Indemnité 22jours"] - ((df_client["Indemnité 22jours"]/22) * df_client["Nbr jours STC (jours)"])
+                   
+                    df_client["Indemnité 22jours"]= df_client["Indemnité 22jours"] - ((df_client["Indemnité 22jours"]/22) * df_client["Nbr jours STC (jours)"])
                 # st.write(df_client["Indemnité 22jours"].head(133))
                 if df_client["Etablissement"].iloc[0] == "LG":
                     df_client["Indemnitésomme"]= df_client["Indemnité de panier calcule"] + df_client["Indemnité de transport calcule"] + df_client["Prime vestimentaire (DZD)"] + df_client["indémnité Véhicule calcule"]+df_client["Avance NET (DZD)"] 
@@ -1262,7 +1220,11 @@ else:
                         - df_client["Salaire de base (DZD)"] / 30 * absences_totallg 
                     )
                     df_client["Salaire de base calcule"] = df_client["Salaire de base calcule"] + df_client["Prime mensuelle (Barème) (DZD)"] 
-                    df_client["Base cotisable"] = df_client["Salaire de base calcule"] + df_client["Prime exeptionnelle (10%) (DZD)"]  + df_client["Indemnité non cotisable et imposable 10% (DZD)"]
+                    df_client["Base cotisable"] = df_client["Salaire de base calcule"] + df_client["Prime exeptionnelle (10%) (DZD)"]  + df_client["Indemnité non cotisable et imposable 10% (DZD)"] 
+                    df_client["Base cotisable"] = (
+                            
+                         df_client["Salaire de base calcule"] + df_client["Prime mensuelle (Barème) (DZD)"]  + df_client["Indemnité non cotisable et imposable 10% (DZD)"]+ df_client["Prime exeptionnelle (10%) (DZD)"]
+                        )
                 else:
                     df_client["Base cotisable"] = (
                             
@@ -1272,7 +1234,7 @@ else:
                 if df_client["Etablissement"].iloc[0] == "LG" :
                     df_client["Base imposable 10%"] = df_client["Indemnité non cotisable et imposable 10% (DZD)"] * 0.91 + df_client["Allocation Aid El Adha NET"]
                 else:
-                    df_client["Base imposable 10%"] = df_client["Indemnité non cotisable et imposable 10% (DZD)"] * 0.91
+                    df_client["Base imposable 10%"] = df_client["Prime exeptionnelle (10%) (DZD)"] * 0.91
 
                 df_client["Retenue CNAS employé"] = df_client["Base cotisable"] * 0.09
                 if df_client["Etablissement"].iloc[0] == "Henkel": 
@@ -1281,9 +1243,9 @@ else:
                 elif   df_client["Etablissement"].iloc[0] == "LG":
                         df_client["Base imposable au baréme"] = np.floor(((((df_client["Salaire de base calcule"] +df_client["Prime exeptionnelle (10%) (DZD)"] ) * 0.91)+ df_client["Indemnité 22jours"]))/ 10) * 10
                 elif df_client["Etablissement"].iloc[0] == "G+D":
-                    df_client["Base imposable au baréme"] = np.floor((((df_client["Salaire de base calcule"] + df_client["Indemnité non cotisable et imposable 10% (DZD)"]) -df_client["Indemnité non cotisable et imposable 10% (DZD)"]) * 0.91 + df_client["Indemnité 22jours"])/10)*10
+                    df_client["Base imposable au baréme"] = np.floor((((df_client["Salaire de base calcule"] + df_client["Prime exeptionnelle (10%) (DZD)"]) -df_client["Prime exeptionnelle (10%) (DZD)"]) * 0.91 + df_client["Indemnité 22jours"])/10)*10
                 else:
-                    df_client["Base imposable au baréme"] = np.floor((((df_client["Base cotisable"] - df_client["Prime exeptionnelle (10%) (DZD)"]- df_client["Indemnité non cotisable et imposable 10% (DZD)"]- df_client["Indemnité zone"]) * 0.91+ (df_client["Indemnité 22jours"])))/ 10) * 10
+                    df_client["Base imposable au baréme"] = np.floor((((df_client["Base cotisable"] - df_client["Prime exeptionnelle (10%) (DZD)"]- df_client["Indemnité non cotisable et imposable 10% (DZD)"]) * 0.91+ (df_client["Indemnité 22jours"])))/ 10) * 10
                     
                 def irg_bareme(base):
                     b = np.ceil(base / 10) * 10  # PLAFOND(...;10) en Excel
@@ -1315,28 +1277,34 @@ else:
                         df_client["Indemnité 22jours"]+
                         df_client["Indemnité non cotisable et imposable 10% (DZD)"]) 
                     )
-                    df_client["Salaire brut"] += np.where(
-                    df_client["Base de régul"] == "Salaire Brut", df_client["Régul"], 0)
+                    # df_client["Salaire brut"] += np.where(
+                    # df_client["Base de régul"] == "Salaire Brut", df_client["Régul"], 0)
                     df_client["Salaire net"] = ((df_client["Salaire de base calcule"]*0.91)+df_client["Indemnité 22jours"])+df_client["Base imposable 10%"]-df_client["IRG barème"]-df_client["IRG 10%"]
-                    df_client["Salaire net"] += np.where(
-                    df_client["Base de régul"] == "Salaire Net", df_client["Régul"], 0).round(0)
-               
+                    # df_client["Salaire net"] += np.where(
+                    # df_client["Base de régul"] == "Salaire Net", df_client["Régul"], 0).round(0)
+                elif df_client["Etablissement"].iloc[0] == "G+D":
+                    df_client["Salaire brut"] = (
+                        (df_client["Base cotisable"] +
+                        (df_client["Indemnité 22jours"])+
+                        df_client["Frais remboursement calcule"]) 
+                    )
+                    df_client["Salaire net"] = ((df_client["Salaire de base calcule"]+df_client["Indemnité 22jours"]+df_client["Prime exeptionnelle (10%) (DZD)"])-((df_client["Prime exeptionnelle (10%) (DZD)"]+df_client["Salaire de base calcule"])*0.09)-df_client["IRG barème"])
                 else : 
                     df_client["Salaire brut"] = (
                         (df_client["Base cotisable"] +
                         (df_client["Indemnité 22jours"])+
                         df_client["Frais remboursement calcule"]) 
                     )
-                    df_client["Salaire brut"] += np.where(
-                    df_client["Base de régul"] == "Salaire Brut", df_client["Régul"], 0)
+                    # df_client["Salaire brut"] += np.where(
+                    # df_client["Base de régul"] == "Salaire Brut", df_client["Régul"], 0)
                     df_client["Salaire net"] = (
                         (df_client["Salaire brut"] -
                         df_client["Retenue CNAS employé"] -
                         df_client["IRG barème"] -
                         df_client["IRG 10%"]) 
                     )
-                    df_client["Salaire net"] += np.where(
-                    df_client["Base de régul"] == "Salaire Net", df_client["Régul"], 0).round(0)
+                    # df_client["Salaire net"] += np.where(
+                    # df_client["Base de régul"] == "Salaire Net", df_client["Régul"], 0).round(0)
                 df_client["CNAS employeur"] = df_client["Base cotisable"] * 0.26
                 df_client["Indemnités Non Cotisable - Mensuelle | Panier, Transport"] = df_client["Indemnité 22jours"]
                 if  df_client["Etablissement"].iloc[0] == "Henkel":
@@ -1366,10 +1334,10 @@ else:
                         + df_client["IRG 10%"]
                         + df_client["IRG barème"]
                         + df_client["Retenue CNAS employé"]
-                        + df_client["Frais téléphone"])
+                        )
                     )
-                    df_client["Coût salaire"] += np.where(
-                    df_client["Base de régul"] == "Cout salaire", df_client["Régul"], 0)
+                    # df_client["Coût salaire"] += np.where(
+                    # df_client["Base de régul"] == "Cout salaire", df_client["Régul"], 0)
                     df_client["Coût congé payé"] = df_client.apply(calcul_cout_conge, axis=1)
                     fees_multiplicateur = 1 + (df_client["Fees etalent"] / 100)
                     
@@ -1377,8 +1345,8 @@ else:
                     if df_client["TAP"].iloc[0] == "Oui" :
                         df_client["TAP (DZD)"] = (df_client["Coût salaire"]+ df_client["Coût congé payé"] + df_client["Taux complément santé (DZD)"])*0.03
                         df_client["Facture HT"] = ((df_client["Coût salaire"] + df_client["Coût congé payé"]+ df_client["TAP (DZD)"] + df_client["Taux complément santé (DZD)"]) * fees_multiplicateur)
-                        df_client["Facture HT + NDF"] = df_client["Facture HT"]+df_client["NDF"]
-                        df_client["Facture HT + NDF"] = pd.to_numeric(df_client["Facture HT + NDF"], errors="coerce").fillna(0)
+                        df_client["Facture HT + NDF"] = df_client["Facture HT"]
+                        # df_client["Facture HT + NDF"] = pd.to_numeric(df_client["Facture HT + NDF"], errors="coerce").fillna(0)
                         if "df_rates" in st.session_state and not st.session_state.df_rates.empty:
                             df_rates = st.session_state.df_rates
 
@@ -1398,12 +1366,13 @@ else:
                             # Choisir le bon taux en fonction de la sélection utilisateur
                             rate = euro_rate if st.session_state.devise_active == "EUR" else usd_rate
                             df_client["Facture HT en devise"] = df_client["Facture HT + NDF"] / rate
+                            df_client["Facture TTC en devise"] = df_client["Facture HT en devis" ]*1.19
 
                     else : 
                         df_client["TAP (DZD)"] = 0.0
                         df_client["Facture HT"] = ((df_client["Coût salaire"] + df_client["Coût congé payé"]+ df_client["TAP (DZD)"])* fees_multiplicateur)
-                        df_client["Facture HT + NDF"] = df_client["Facture HT"]+df_client["NDF"]
-                        df_client["Facture HT + NDF"] = pd.to_numeric(df_client["Facture HT + NDF"], errors="coerce").fillna(0)
+                        df_client["Facture HT + NDF"] = df_client["Facture HT"]
+                        # df_client["Facture HT + NDF"] = pd.to_numeric(df_client["Facture HT + NDF"], errors="coerce").fillna(0)
                       
                         if "df_rates" in st.session_state and not st.session_state.df_rates.empty:
                             df_rates = st.session_state.df_rates
@@ -1424,6 +1393,7 @@ else:
                             # Choisir le bon taux en fonction de la sélection utilisateur
                             rate = euro_rate if st.session_state.devise_active == "EUR" else usd_rate
                             df_client["Facture HT en devise"] = df_client["Facture HT + NDF"] / rate
+                            df_client["Facture TTC en devise"] = df_client["Facture HT en devis" ]*1.19
 
                 elif df_client["Etablissement"].iloc[0] == "LG":
                     df_client["Coût salaire"] = (
@@ -1434,16 +1404,16 @@ else:
                         + df_client["IRG 10%"]
                         + df_client["IRG barème"]
                         + df_client["Retenue CNAS employé"]
-                        + df_client["Frais téléphone"]) 
+                       ) 
                     )
-                    df_client["Coût salaire"] += np.where(
-                    df_client["Base de régul"] == "Cout salaire", df_client["Régul"], 0)
+                    # df_client["Coût salaire"] += np.where(
+                    # df_client["Base de régul"] == "Cout salaire", df_client["Régul"], 0)
                     df_client["Coût congé payé"] = df_client.apply(calcul_cout_conge, axis=1)
                     fees_multiplicateur = 1 + (df_client["Fees etalent"] / 100)
                     if df_client["TAP"].iloc[0] == "Oui" :
                         df_client["TAP (DZD)"] = (df_client["Coût salaire"] + ( df_client["Coût salaire"] * df_client["Fees etalent"])) * 0.02
                         df_client["Facture HT"] = ((df_client["Coût salaire"] * fees_multiplicateur) + df_client["TAP (DZD)"])+ df_client["Taux complément santé (DZD)"] 
-                        df_client["Facture HT + NDF"] = df_client["Facture HT"]+df_client["NDF"]
+                        df_client["Facture HT + NDF"] = df_client["Facture HT"]
                         
                         if "df_rates" in st.session_state and not st.session_state.df_rates.empty:
                             df_rates = st.session_state.df_rates
@@ -1464,11 +1434,12 @@ else:
                             # Choisir le bon taux en fonction de la sélection utilisateur
                             rate = euro_rate if st.session_state.devise_active == "EUR" else usd_rate
                             df_client["Facture HT en devise"] = df_client["Facture HT + NDF"] / rate
+                            df_client["Facture TTC en devise"] = df_client["Facture HT en devis" ]*1.19
                     else : 
                         df_client["TAP (DZD)"] = 0.0
                         df_client["Facture HT"] = ((df_client["Coût salaire"] * fees_multiplicateur))+ df_client["Taux complément santé (DZD)"] 
-                        df_client["Facture HT + NDF"] = df_client["Facture HT"]+df_client["NDF"]
-                        df_client["Facture HT + NDF"] = pd.to_numeric(df_client["Facture HT + NDF"], errors="coerce").fillna(0)
+                        df_client["Facture HT + NDF"] = df_client["Facture HT"]
+                        # df_client["Facture HT + NDF"] = pd.to_numeric(df_client["Facture HT + NDF"], errors="coerce").fillna(0)
                         
                         if "df_rates" in st.session_state and not st.session_state.df_rates.empty:
                             df_rates = st.session_state.df_rates
@@ -1489,6 +1460,7 @@ else:
                             # Choisir le bon taux en fonction de la sélection utilisateur
                             rate = euro_rate if st.session_state.devise_active == "EUR" else usd_rate
                             df_client["Facture HT en devise"] = df_client["Facture HT + NDF"] / rate
+                            df_client["Facture TTC en devise"] = df_client["Facture HT en devis" ]*1.19
 
                 elif df_client["Etablissement"].iloc[0] == "Maersk":
                     df_client["Coût salaire"] = (
@@ -1499,15 +1471,15 @@ else:
                         + df_client["IRG barème"]
                         + df_client["Retenue CNAS employé"])
                     )
-                    df_client["Coût salaire"] += np.where(
-                    df_client["Base de régul"] == "Cout salaire", df_client["Régul"], 0)
+                    # df_client["Coût salaire"] += np.where(
+                    # df_client["Base de régul"] == "Cout salaire", df_client["Régul"], 0)
                     df_client["Coût congé payé"] = df_client.apply(calcul_cout_conge, axis=1)
                     fees_multiplicateur = 1 + (df_client["Fees etalent"] / 100)
                     if df_client["TAP"].iloc[0] == "Oui" :
                         df_client["TAP (DZD)"] = (df_client["Coût salaire"] + ( df_client["Coût salaire"] * df_client["Fees etalent"])) * 0.02
                         df_client["Facture HT"] = ((df_client["Coût salaire"] + df_client["Coût congé payé"]+ df_client["TAP (DZD)"])* fees_multiplicateur)
-                        df_client["Facture HT + NDF"] = df_client["Facture HT"]+df_client["NDF"]
-                        df_client["Facture HT + NDF"] = pd.to_numeric(df_client["Facture HT + NDF"], errors="coerce").fillna(0)
+                        df_client["Facture HT + NDF"] = df_client["Facture HT"]
+                        # df_client["Facture HT + NDF"] = pd.to_numeric(df_client["Facture HT + NDF"], errors="coerce").fillna(0)
                         
                         if "df_rates" in st.session_state and not st.session_state.df_rates.empty:
                             df_rates = st.session_state.df_rates
@@ -1528,11 +1500,12 @@ else:
                             # Choisir le bon taux en fonction de la sélection utilisateur
                             rate = euro_rate if st.session_state.devise_active == "EUR" else usd_rate
                             df_client["Facture HT en devise"] = df_client["Facture HT + NDF"] / rate
+                            df_client["Facture TTC en devise"] = df_client["Facture HT en devis" ]*1.19
 
                     else : 
                         df_client["TAP (DZD)"] = 0.0
                         df_client["Facture HT"] = ((df_client["Coût salaire"] + df_client["Coût congé payé"]+ df_client["TAP (DZD)"])* fees_multiplicateur)
-                        df_client["Facture HT + NDF"] = df_client["Facture HT"]+df_client["NDF"]
+                        df_client["Facture HT + NDF"] = df_client["Facture HT"]
                         
                         if "df_rates" in st.session_state and not st.session_state.df_rates.empty:
                             df_rates = st.session_state.df_rates
@@ -1553,17 +1526,18 @@ else:
                             # Choisir le bon taux en fonction de la sélection utilisateur
                             rate = euro_rate if st.session_state.devise_active == "EUR" else usd_rate
                             df_client["Facture HT en devise"] = df_client["Facture HT + NDF"] / rate
+                            df_client["Facture TTC en devise"] = df_client["Facture HT en devis" ]*1.19
                         
                 elif df_client["Etablissement"].iloc[0] == "G+D":
                     df_client["Coût salaire"] = (df_client["Salaire de base calcule"] + df_client["Indemnité de panier calcule"] + df_client["Indemnité de transport calcule"] +df_client["Prime vestimentaire (DZD)"]+df_client["Frais remboursement calcule"]+df_client["Prime exeptionnelle (10%) (DZD)"]) 
-                    df_client["Coût salaire"] += np.where(
-                    df_client["Base de régul"] == "Cout salaire", df_client["Régul"], 0)
+                    # df_client["Coût salaire"] += np.where(
+                    # df_client["Base de régul"] == "Cout salaire", df_client["Régul"], 0)
                     fees_multiplicateur = 1 + (df_client["Fees etalent"] / 100)
                     if df_client["TAP"].iloc[0] == "Oui" :
                         df_client["TAP (DZD)"] = (df_client["Coût salaire"] + ( df_client["Coût salaire"] * df_client["Fees etalent"])) * 0.02
                         df_client["Facture HT"] = ((df_client["Coût salaire"] * fees_multiplicateur) + df_client["TAP (DZD)"])
-                        df_client["Facture HT + NDF"] = df_client["Facture HT"]+df_client["NDF"]
-                        df_client["Facture HT + NDF"] = pd.to_numeric(df_client["Facture HT + NDF"], errors="coerce").fillna(0)
+                        df_client["Facture HT + NDF"] = df_client["Facture HT"]
+                        # df_client["Facture HT + NDF"] = pd.to_numeric(df_client["Facture HT + NDF"], errors="coerce").fillna(0)
                         
                         if "df_rates" in st.session_state and not st.session_state.df_rates.empty:
                             df_rates = st.session_state.df_rates
@@ -1584,12 +1558,13 @@ else:
                             # Choisir le bon taux en fonction de la sélection utilisateur
                             rate = euro_rate if st.session_state.devise_active == "EUR" else usd_rate
                             df_client["Facture HT en devise"] = df_client["Facture HT + NDF"] / rate
+                            df_client["Facture TTC en devise"] = df_client["Facture HT en devis" ]*1.19
 
                     else : 
                         df_client["TAP (DZD)"] = 0.0
                         df_client["Facture HT"] = ((df_client["Coût salaire"] * fees_multiplicateur))
-                        df_client["Facture HT + NDF"] = df_client["Facture HT"]+df_client["NDF"]
-                        df_client["Facture HT + NDF"] = pd.to_numeric(df_client["Facture HT + NDF"], errors="coerce").fillna(0)
+                        df_client["Facture HT + NDF"] = df_client["Facture HT"]
+                        # df_client["Facture HT + NDF"] = pd.to_numeric(df_client["Facture HT + NDF"], errors="coerce").fillna(0)
                         
                         if "df_rates" in st.session_state and not st.session_state.df_rates.empty:
                             df_rates = st.session_state.df_rates
@@ -1610,6 +1585,7 @@ else:
                             # Choisir le bon taux en fonction de la sélection utilisateur
                             rate = euro_rate if st.session_state.devise_active == "EUR" else usd_rate
                             df_client["Facture HT en devise"] = df_client["Facture HT + NDF"] / rate
+                            df_client["Facture TTC en devise"] = df_client["Facture HT en devis" ]*1.19
 
                 else:
                     df_client["Coût congé payé"] = df_client.apply(calcul_cout_conge, axis=1)
@@ -1618,18 +1594,16 @@ else:
                         (df_client["Masse salariale"]
                         + df_client["Coût congé payé"]
                         + df_client["Taux complément santé (DZD)"]
-                        + df_client["Frais divers"]
-                        + df_client["Frais de transport (Yassir)"]
-                        + df_client["Frais téléphone"]) 
+                        ) 
                     )
-                    df_client["Coût salaire"] += np.where(
-                    df_client["Base de régul"] == "Cout salaire", df_client["Régul"], 0)
+                    # df_client["Coût salaire"] += np.where(
+                    # df_client["Base de régul"] == "Cout salaire", df_client["Régul"], 0)
                     fees_multiplicateur = 1 + (df_client["Fees etalent"] / 100)
                     if df_client["TAP"].iloc[0] == "Oui" :
                         df_client["TAP (DZD)"] = (df_client["Coût salaire"] + ( df_client["Coût salaire"] * (df_client["Fees etalent"]/100))) * 0.02
                         df_client["Facture HT"] = ((df_client["Coût salaire"] * fees_multiplicateur) + df_client["TAP (DZD)"])
-                        df_client["Facture HT + NDF"] = df_client["Facture HT"] + df_client["NDF"]
-                        df_client["Facture HT + NDF"] = pd.to_numeric(df_client["Facture HT + NDF"], errors="coerce").fillna(0)
+                        df_client["Facture HT + NDF"] = df_client["Facture HT"] 
+                        # df_client["Facture HT + NDF"] = pd.to_numeric(df_client["Facture HT + NDF"], errors="coerce").fillna(0)
                         
                         if "df_rates" in st.session_state and not st.session_state.df_rates.empty:
                             df_rates = st.session_state.df_rates
@@ -1650,12 +1624,13 @@ else:
                             # Choisir le bon taux en fonction de la sélection utilisateur
                             rate = euro_rate if st.session_state.devise_active == "EUR" else usd_rate
                             df_client["Facture HT en devise"] = df_client["Facture HT + NDF"] / rate
+                            df_client["Facture TTC en devise"] = df_client["Facture HT en devis" ]*1.19
 
                     else : 
                         df_client["TAP (DZD)"] = 0.0
                         df_client["Facture HT"] = ((df_client["Coût salaire"] * fees_multiplicateur))
-                        df_client["Facture HT + NDF"] = df_client["Facture HT"] + df_client["NDF"]
-                        df_client["Facture HT + NDF"] = pd.to_numeric(df_client["Facture HT + NDF"], errors="coerce").fillna(0)
+                        df_client["Facture HT + NDF"] = df_client["Facture HT"] 
+                        # df_client["Facture HT + NDF"] = pd.to_numeric(df_client["Facture HT + NDF"], errors="coerce").fillna(0)
                         
                         if "df_rates" in st.session_state and not st.session_state.df_rates.empty:
                             df_rates = st.session_state.df_rates
@@ -1676,14 +1651,15 @@ else:
                             # Choisir le bon taux en fonction de la sélection utilisateur
                             rate = euro_rate if st.session_state.devise_active == "EUR" else usd_rate
                             df_client["Facture HT en devise"] = df_client["Facture HT + NDF"] / rate
+                            df_client["Facture TTC en devise"] = df_client["Facture HT en devis" ]*1.19
                 # Construire un DataFrame avec toutes les nouvelles colonnes
                 new_cols = pd.DataFrame({
                     "Frais remboursement": df_client["Frais remboursement calcule"],
                     "Salaire de base": df_client["Salaire de base calcule"],
                     "Indemnité de panier": df_client["Indemnité de panier calcule"],
                     "Indemnité de transport": df_client["Indemnité de transport calcule"],
-                    "Facture TVA": df_client["Facture HT + NDF"] * (df_client["TVA"] / 100),
-                    "Facture TTC": df_client["Facture HT + NDF"] * (1 + df_client["TVA"] / 100),
+                    "Facture TVA": df_client["Facture HT + NDF"] * (1.19 / 100),
+                    "Facture TTC": df_client["Facture HT + NDF"] * (1 + 1.19 / 100),
                     "Observation": Observation
                 })
 
@@ -1735,16 +1711,8 @@ else:
                                 ordered_employe_data[key] = employe_data[key]
 
                     employe_data = ordered_employe_data
-
                 else:
-                    # Plusieurs candidats → pivot classique
-                    # Pivot avec somme (ou autre agrégation)
-                    # df_pivot = (
-                    #     df_client
-                    #     .groupby(id_cols + ["Mois"])[val_cols]
-                    #     .sum(min_count=1)   # garde NaN si tout est vide
-                    #     .unstack(fill_value=None)
-                    # )
+                   
                     df_pivot = (
                         df_client
                         .groupby(id_cols + ["Mois"], dropna=False)[val_cols]
@@ -1812,71 +1780,53 @@ else:
                 # ------------------------------------------------
                 st.markdown("### 📥 Télécharger la facture PDF par employé")
 
+                # 📌 Nouveau fichier par client
+                
+                # Nom du client
+                client_name = str(df_client["Etablissement"].iloc[0]).strip()
+                fichier_client = f"{client_name}_factures.xlsx"
+
+                wb = Workbook()
+                wb.remove(wb.active)  # supprimer la feuille vide
+
                 if nb_candidats == 1:
-                    # Un seul candidat → on a déjà consolidé toutes les lignes dans employe_data
-                    nom = employe_data.get("Nom", "employe").replace(" ", "_")
-                    matricule = str(employe_data.get("N°", "id"))
-
-                    # Générer le fichier Excel
-                    fichier_excel = generer_facture_excel(employe_data, f"{matricule}_{nom}_facture.xlsx")
+                    # Un seul employé → créer UNE seule feuille consolidée
+                    nom = df_client.iloc[0]["Nom"].replace(" ", "_")
+                    matricule = str(df_client.iloc[0]["N°"])
                     
-                    # Lecture pour Streamlit
-                    with open(fichier_excel, "rb") as f:
-                        excel_data = f.read()
-
-                    st.download_button(
-                        label=f"📊 {nom}",
-                        data=excel_data,
-                        file_name=f"{nom}_facture.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key=f"excel_{matricule}"
-                    )
-
-                    # Upload Drive
-                    drive_file_id = upload_to_drive(
-                        fichier_excel,
-                        client_name=employe_data.get("Etablissement", "Inconnu"),
-                        root_folder_id="0AM1AktJToIM1Uk9PVA"
-                    )
-                    print("📂 Fichier envoyé sur Drive :", drive_file_id)
-
-                    # Supprimer local
-                    os.remove(fichier_excel)
-
+                    ws = wb.create_sheet(title=f"{matricule}_{nom}")
+                    generer_facture_excel_sheet(employe_data, ws, wb)
                 else:
-                    # Plusieurs candidats → df_pivot existe
+                    # Plusieurs employés → plusieurs feuilles
                     for idx, row in df_pivot.iterrows():
                         nom = str(row.get("Nom", f"employe_{idx}")).strip().replace(" ", "_")
                         matricule = str(row.get("N°", f"id_{idx}")).strip()
 
-                        employe_data = row.to_dict()
+                        ws = wb.create_sheet(title=f"{matricule}_{nom}")
+                        generer_facture_excel_sheet(row.to_dict(), ws, wb)
 
-                        fichier_excel = generer_facture_excel(employe_data, f"{matricule}_{nom}_facture.xlsx")
-                        print("📊 Employés présents dans df_pivot :", df_pivot["Nom"].unique())
+                # Sauvegarde
+                wb.save(fichier_client)
 
-                        with open(fichier_excel, "rb") as f:
-                            excel_data = f.read()
+                # Télécharger
+                with open(fichier_client, "rb") as f:
+                    st.download_button(
+                        label=f"📘 Télécharger factures client {client_name}",
+                        data=f.read(),
+                        file_name=fichier_client,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                drive_file_id = upload_to_drive(
+                    fichier_client,  # <-- utiliser fichier_client ici
+                    client_name=row.get("Etablissement", "Inconnu") if nb_candidats > 1 else client_name,
+                    root_folder_id="0AM1AktJToIM1Uk9PVA"
+                )
 
-                        st.download_button(
-                            label=f"📊 {nom}",
-                            data=excel_data,
-                            file_name=f"{nom}_facture.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key=f"excel_{matricule}_{idx}"
-                        )
-
-                        drive_file_id = upload_to_drive(
-                            fichier_excel,
-                            client_name=row.get("Etablissement", "Inconnu"),
-                            root_folder_id="0AM1AktJToIM1Uk9PVA"
-                        )
-
-                        os.remove(fichier_excel)
-
-
-
+                # Supprimer le fichier local
+                os.remove(fichier_client)
 
             else:
                 st.warning("⚠️ Aucun employé trouvé pour ce client ")
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
+            
