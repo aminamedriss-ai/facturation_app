@@ -786,6 +786,7 @@ else:
     # 📁 Upload du fichier global
     # GLOBAL_CSV = "data_global.csv"
     st.sidebar.subheader("📅 Charger le fichier Récap")
+    is_complement = st.sidebar.checkbox("📌 Complémentaire ?", value=False)
     uploaded_csv = st.sidebar.file_uploader("Fichier CSV Récap", type=["csv"], key="csv_recap")
     
     MOIS_MAP = {
@@ -806,8 +807,6 @@ else:
     if uploaded_csv is not None:
         try:
             raw = uploaded_csv.getvalue()
-
-            # Corriger les espaces insécables (U+202F)
             raw = raw.replace(b"\xe2\x80\xaf", b" ")
 
             # Charger CSV
@@ -818,38 +817,12 @@ else:
                 decimal=",",
                 thousands=" "
             )
-            # df_full.rename(columns=lambda col: MOIS_MAP.get(col, col), inplace=True)
-            # Nettoyer colonnes texte (uniquement object/string)
-            # Colonnes à NE PAS nettoyer (texte pur)
-            # cols_a_nettoyer = ["Travel expenses M segment", "Travel expenses C segment", "Allowance M segment", "Allowance C segment"]
-
-            # Colonnes candidates au nettoyage
-            # cols_a_nettoyer = [c for c in df_full.columns if c not in cols_texte]
-
-            # for col in cols_a_nettoyer:
-            #     if df_full[col].dtype == "object":  # seulement object
-            #         df_full[col] = (
-            #             df_full[col]
-            #             .astype(str)
-            #             .str.replace("\u202f", "", regex=False)  # supprime espaces insécables
-            #             .str.replace(" ", "", regex=False)       # supprime espaces normaux
-            #             .str.replace(",", ".", regex=False)      # remplace virgule par point
-            #             .str.replace(r"[^\d\.-]", "", regex=True)  # garde chiffres, . et -
-            #             .replace("", "0")
-            #             .astype(float)
-            #         )
-            #         df_full[col] = pd.to_numeric(df_full[col], errors="coerce")
-
-
-            # # Convertir en float si possible
-            # for col in df_full.columns:
-            #     df_full[col] = pd.to_numeric(df_full[col], errors="coerce")
-            st.write(df_full.head())
             st.session_state.full_df = df_full
-            st.sidebar.success("✅ Fichier chargé avec succès !")
+            st.write("📄 Contenu CSV importé :")
+            st.dataframe(df_full.head())
 
-            # 🚑 Nettoyer les NaN et inf (pour JSON)
-            df_full = df_full.replace([np.nan, np.inf, -np.inf], None)
+            # Nettoyer NaN et inf
+            df_full = df_full.replace([np.nan, np.inf, -np.inf], 0)
 
             # Vérifier et normaliser la colonne Mois
             if "Mois" in df_full.columns:
@@ -859,32 +832,231 @@ else:
                 st.error("❌ La colonne 'Mois' est manquante dans le CSV")
                 mois = "Inconnu"
 
-            # Supprimer les anciennes lignes du même mois
-            
-            supabase.table("Recap").delete().eq("Mois", mois).execute()
+            # Déterminer la table cible
+            table_target = "Recap_complément" if is_complement else "Recap"
 
-            # 🔎 Récupérer le max(id) existant
-            res = supabase.table("Recap").select("id").order("id", desc=True).limit(1).execute()
-            start_id = res.data[0]["id"] + 1 if res.data else 1
+            if is_complement:
+                # Lire la recap existante pour le même mois
+                res = supabase.table("Recap").select("*").eq("Mois", mois).execute()
+                cols = supabase.table("Recap").select("*").limit(1).execute()
+                # st.write("Colonnes réellement présentes :", list(cols.data[0].keys()))
 
-            # Assigner des id uniques
-            df_full.insert(0, "id", range(start_id, start_id + len(df_full)))
+                df_recap = pd.DataFrame(res.data)
+                if df_recap.empty:
+                    st.warning("⚠ Pas de récap existante pour ce mois, tout sera considéré comme complément.")
+                    df_diff = df_full.copy()
+                else:
+                    # Colonnes numériques à comparer
+                    # Identifier les colonnes à comparer
+                    cols_to_check = ["Absence (Jour)","Heure Absence(H)",	"Absence Maladie (Jour)",	"Absence Maternité (Jour)",	"Absence Mise à pied (Jour)","Total absence (sur 22 jours)","Heures supp 100% (H)"	,"Heures supp 75% (H)","Heures supp 50% (H)","Jours supp (Jour)"	,"Prime mensuelle (Barème) (DZD)",	"Prime exeptionnelle (10%) (DZD)","Indemnité non cotisable et imposable 10% (DZD)"	,"Rappel indemnité (brut)","Avance NET (DZD)"	,"Indemnité de départ (Net)"	,"Allocation Aid El Adha NET"	,"Allocations exceptionnelles NET"	,"Jours de congé (Jour)"]
+                    for col in cols_to_check:
+                        df_full[col] = pd.to_numeric(df_full[col], errors="coerce").fillna(0)
+                        if not df_recap.empty:
+                            df_recap[col] = pd.to_numeric(df_recap[col], errors="coerce").fillna(0)
+                    
+                    missing_cols = [col for col in cols_to_check if col not in df_recap.columns]
+                    if missing_cols:
+                        st.warning(f"⚠ Ces colonnes sont absentes dans Recap et seront considérées à 0 : {missing_cols}")
+                        for col in missing_cols:
+                            df_recap[col] = 0
 
-            # Insérer les nouvelles lignes par batch
-            records = df_full.to_dict(orient="records")
-            CHUNK = 1000
-            for i in range(0, len(records), CHUNK):
-                batch = records[i:i+CHUNK]
-                if batch:
-                    supabase.table("Recap").insert(batch).execute()
+                    # Merge pour aligner les lignes par Matricule
+                    df_merge = df_full.merge(
+                        df_recap[["N°"] + cols_to_check],  # ne prendre que les colonnes à comparer
+                        on=["N°"], 
+                        suffixes=("_new", "_old")
+                    )
 
-            st.success(f"✅ Données mises à jour pour **{mois}** dans Supabase (table Recap)")
-            # st.dataframe(df_full)
+                    # Calculer les différences uniquement sur les colonnes numériques
+                    df_diff = df_merge.copy()
+                    for col in cols_to_check:
+                        col_new = f"{col}_new"
+                        col_old = f"{col}_old"
+                        df_diff[col] = df_merge[col_new] - df_merge[col_old]
+
+
+                    df_diff = df_diff[["N°"] + cols_to_check]
+                    df_diff = df_diff[(df_diff[cols_to_check].sum(axis=1) != 0)]
+                    # Colonnes non numériques (ex : booléennes)
+                    bool_cols = df_full.select_dtypes(include=["bool"]).columns.tolist()
+                    for col in bool_cols:
+                        col_new = f"{col}_new"
+                        col_old = f"{col}_old"
+                        if col_new in df_merge.columns and col_old in df_merge.columns:
+                            # Convertir en int pour pouvoir soustraire ou utiliser XOR
+                            df_diff[col] = df_diff[col_new].astype(int) - df_diff[col_old].astype(int)
+
+
+                if not df_diff.empty:
+                    st.write("⚡ Différences détectées :")
+                    st.dataframe(df_diff)
+
+                    # ✅ Bouton pour valider les différences
+                    if st.button("Valider et ajouter au mois suivant"):
+                        # Déterminer le mois suivant
+                        mois_liste = list(MOIS_MAP.values())
+                        mois_actuel = MOIS_MAP.get(mois, mois)
+                        idx = mois_liste.index(mois_actuel)
+                        mois_suivant = mois_liste[(idx + 1) % 12]
+
+                        st.write(f"Mois suivant : {mois_suivant}")
+                        df_diff["Mois"] = mois_suivant
+
+                        # Pour chaque ligne dans df_diff
+                        for _, row in df_diff.iterrows():
+                            matricule = row["N°"]
+
+                            # Vérifier si la ligne existe déjà pour ce matricule et mois_suivant
+                            res = supabase.table("Recap").select("*").eq('"N°"', matricule).eq("Mois", mois_suivant).execute()
+                            existing = res.data
+                            
+
+                            if existing:
+                                
+                                existing_row = existing[0]
+
+                                update_data = {}
+
+                                # Colonnes numériques à additionner
+                                for col in cols_to_check:
+                                    val_existing = existing_row.get(col, 0)
+                                    val_new = row.get(col, 0)
+                                    
+                                    try:
+                                        val_existing = float(val_existing)
+                                    except:
+                                        val_existing = 0
+                                        
+                                    try:
+                                        val_new = float(val_new)
+                                    except:
+                                        val_new = 0
+                                        
+                                    update_data[col] = val_existing + val_new
+
+                                # Colonnes restantes (non numériques)
+                                for col in df_full.columns:
+                                    if col not in cols_to_check:
+                                        update_data[col] = row.get(col, existing_row.get(col, None))
+
+                                supabase.table("Recap").update(update_data)\
+                                    .eq('"N°"', matricule)\
+                                    .eq("Mois", mois_suivant)\
+                                    .execute()
+                            else:
+                                for _, row in df_full.iterrows():
+                                    matricule = row["N°"]
+
+                                    # Vérifier si ligne existe déjà pour le mois
+                                    res = supabase.table("Recap").select("*").eq('"N°"', matricule).eq("Mois", mois).execute()
+                                    existing = res.data
+                                    update_data = {}
+
+                                    if existing:
+                                        existing_row = existing[0]
+                                        for col in df_full.columns:
+                                            val_new = row.get(col, 0)
+                                            val_existing = existing_row.get(col, 0)
+
+                                            # Colonnes numériques → addition
+                                            if col in cols_to_check:
+                                                try: val_new = float(val_new)
+                                                except: val_new = 0
+                                                try: val_existing = float(val_existing)
+                                                except: val_existing = 0
+                                                update_data[col] = val_existing + val_new
+                                            else:
+                                                update_data[col] = val_new if val_new not in [None, ""] else val_existing
+
+                                        supabase.table("Recap").update(update_data).eq('"N°"', matricule).eq("Mois", mois).execute()
+                                    else:
+                                        # Nouvelle ligne
+                                        res_id = supabase.table("Recap").select("id").order("id", desc=True).limit(1).execute()
+                                        start_id = res_id.data[0]["id"] + 1 if res_id.data else 1
+                                        row_dict = row.to_dict()
+                                        row_dict["id"] = start_id
+                                        for col in df_full.columns:
+                                            if col not in row_dict:
+                                                row_dict[col] = 0 if col in cols_to_check else None
+                                        supabase.table("Recap").insert(row_dict).execute()
+                        st.success(f"✅ Compléments ajoutés ou mis à jour dans le mois suivant ({mois_suivant})")
+
+                else:
+                    st.info("ℹ Aucun complément détecté, aucune différence trouvée.")
+
+            else:
+                st.write("🔄 Fusion avec les données existantes...")
+
+                # Colonnes numériques à additionner
+                cols_to_check = ["Absence (Jour)", "Heure Absence(H)", "Absence Maladie (Jour)",
+                                "Absence Maternité (Jour)", "Absence Mise à pied (Jour)",
+                                "Total absence (sur 22 jours)", "Heures supp 100% (H)",
+                                "Heures supp 75% (H)", "Heures supp 50% (H)",
+                                "Jours supp (Jour)", "Prime mensuelle (Barème) (DZD)",
+                                "Prime exeptionnelle (10%) (DZD)",
+                                "Indemnité non cotisable et imposable 10% (DZD)",
+                                "Rappel indemnité (brut)", "Avance NET (DZD)",
+                                "Indemnité de départ (Net)", "Allocation Aid El Adha NET",
+                                "Allocations exceptionnelles NET", "Jours de congé (Jour)"]
+
+                # Récupérer le mois déjà en base (inclut compléments)
+                existing = supabase.table("Recap").select("*").eq("Mois", mois).execute()
+                df_existing = pd.DataFrame(existing.data)
+
+                if df_existing.empty:
+                    st.warning("⚠ Aucun récap existant : insertion directe.")
+                    res = supabase.table("Recap").select("id").order("id", desc=True).limit(1).execute()
+                    start_id = res.data[0]["id"] + 1 if res.data else 1
+                    df_full.insert(0, "id", range(start_id, start_id + len(df_full)))
+                    supabase.table("Recap").insert(df_full.to_dict(orient="records")).execute()
+                    st.success(f"✅ Données enregistrées pour {mois}")
+                else:
+                    # MERGE
+                    df_merge = df_full.merge(df_existing, on="N°", how="left", suffixes=("_new", "_old"))
+                    df_final = df_full.copy()
+
+                    # ADDITION DES COLONNES NUMÉRIQUES
+                    for col in cols_to_check:
+                        new_col = f"{col}_new"
+                        old_col = f"{col}_old"
+
+                        if new_col not in df_merge.columns:
+                            # pas de suffixe = colonne inexistante → normaliser à 0
+                            df_merge[new_col] = 0
+                        if old_col not in df_merge.columns:
+                            df_merge[old_col] = 0
+
+                        df_final[col] = (
+                            pd.to_numeric(df_merge[new_col], errors="coerce").fillna(0)
+                            +
+                            pd.to_numeric(df_merge[old_col], errors="coerce").fillna(0)
+                        )
+
+                    # COLONNES NON NUMÉRIQUES
+                    for col in df_full.columns:
+                        if col not in cols_to_check and col != "N°":
+                            new_col = f"{col}_new"
+                            old_col = f"{col}_old"
+
+                            if new_col in df_merge.columns and old_col in df_merge.columns:
+                                df_final[col] = df_merge[new_col].combine_first(df_merge[old_col])
+                            else:
+                                df_final[col] = df_full[col]
+
+                    # UPDATE / INSERT
+                    for _, row in df_final.iterrows():
+                        supabase.table("Recap")\
+                            .update(row.to_dict())\
+                            .eq("Mois", mois)\
+                            .eq('"N°"', row["N°"])\
+                            .execute()
+
+                    st.success(f"✅ Fusion terminée : récap normal + complément conservés pour {mois}")
+
+
 
         except Exception as e:
             st.sidebar.error(f"❌ Erreur : {e}")
-
-    
     # ➕ Ajouter un nouveau client
     
     st.sidebar.subheader("➕ Ajouter un nouveau client")
@@ -1830,4 +2002,5 @@ else:
         else:
             st.info("Veuillez d'abord téléverser le fichier récapitulatif global dans la barre latérale.")
             
+
 
